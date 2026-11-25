@@ -36,7 +36,7 @@ void main() {
       {},
       {...shellStatus(), 'v': 2},
       {...shellStatus(), 'v': 1.0},
-      {...shellStatus(), 'backend': 'root'},
+      {...shellStatus(), 'backend': 'unknown'},
       {...shellStatus(), 'enabled': 1},
       {...shellStatus(), 'ready': 'yes'},
     ]) {
@@ -46,6 +46,16 @@ void main() {
       expect(status.ready, isFalse);
       expect(status.uid, isNull);
       expect(status.reasonCode, isNotNull);
+    }
+  });
+
+  test('direct Root reports UID 0 and rejects inconsistent ready status', () {
+    final status = AndroidShellStatus.fromMap(shellStatus(backend: 'root', enabled: true, ready: true, uid: 0));
+    expect(status.backend, AndroidShellBackend.root);
+    expect(status.ready, isTrue);
+    expect(status.uid, 0);
+    for (final uid in [null, 2000]) {
+      expect(AndroidShellStatus.fromMap(shellStatus(backend: 'root', ready: true, uid: uid)).supported, isFalse);
     }
   });
 

@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 55
     env:
       DSH_MAVEN_MIRRORS: 0
+      DSH_TEST_FONT_DIR: /usr/share/fonts/opentype/noto
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -40,18 +41,40 @@ jobs:
           flutter pub get --enforce-lockfile
           printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
           gradle --project-dir android wrapper --gradle-version 9.3.1
-          python3 tool/l10n_merge.py --check
+          python3 tool/l10n_merge.py
+          git diff --exit-code -- lib/l10n
           python3 tool/guide_sync.py --check
       - name: Android Shell and Root native tests
         working-directory: app/android
         run: >-
           ./gradlew --stacktrace :app:testArm64DebugUnitTest -x :app:compileFlutterBuildArm64Debug
           --tests '*.PhoneAndroidShellTest' --tests '*.phone.shell.*' --tests '*.RootBackendTest'
+      - name: Install widget-test fonts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
       - name: Android Shell settings tests
         working-directory: app
         run: flutter test --no-pub test/phone/android_shell
+      - name: Restore runtime downloads
+        id: runtime-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: runtime/.cache
+          key: runtime-downloads-v1-${{ hashFiles('runtime/build-runtime.sh', 'runtime/locks/**') }}
+          restore-keys: runtime-downloads-v1-
       - name: Build bundled arm64 runtime
         run: runtime/build-runtime.sh arm64-v8a
+      - name: Save runtime downloads
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: runtime/.cache
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - name: Install the pinned NDK
+        run: |
+          ndk="$(jq -r .ndkVersion runtime/tawcroot/source.json)"
+          if [[ ! -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]]; then sdkmanager "ndk;$ndk"; fi
       - name: Build isolated arm64 APK
         run: tooling/build-apk.sh --side --no-companion --keep-daemon
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

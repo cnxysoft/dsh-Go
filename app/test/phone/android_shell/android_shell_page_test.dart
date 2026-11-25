@@ -94,7 +94,9 @@ void main() {
   testWidgets('direct Root only connects after the explicit risk notice', (tester) async {
     final native = await _pump(
       tester,
-      native: ShellNative(status: shellStatus(enabled: true, backend: 'root', reasonCode: 'rootNotConnected')),
+      native: ShellNative(
+        status: shellStatus(enabled: true, backend: 'root', reasonCode: 'rootNotConnected'),
+      ),
     );
     expect(native.calls.map((call) => call.method), ['androidShellStatus']);
     expect(find.byKey(const ValueKey('android-shell-authorize')), findsNothing);
