@@ -131,6 +131,7 @@ jobs:
         run: |
           ndk="$(jq -r .ndkVersion runtime/tawcroot/source.json)"
           if [[ ! -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]]; then sdkmanager "ndk;$ndk"; fi
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ndk" >> "$GITHUB_ENV"
       - name: Build isolated arm64 APK
         run: tooling/build-apk.sh --side --no-companion --keep-daemon
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
