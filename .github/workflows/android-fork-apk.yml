@@ -13,12 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  arm64:
+  checks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 25
     env:
       DSH_MAVEN_MIRRORS: 0
-      DSH_TEST_FONT_DIR: /usr/share/fonts/opentype/noto
+      DSH_TEST_FONT_DIR: ${{ runner.temp }}/dsh-test-fonts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -51,11 +51,21 @@ jobs:
           --tests '*.PhoneAndroidShellTest' --tests '*.phone.shell.*' --tests '*.RootBackendTest'
       - name: Install widget-test fonts
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra
+          mkdir -p "$DSH_TEST_FONT_DIR"
+          for face in Light Regular Bold; do
+            curl --fail --silent --show-error --location --retry 2 --max-time 60               "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTC/NotoSansCJK-$face.ttc"               -o "$DSH_TEST_FONT_DIR/NotoSansCJK-$face.ttc"
+          done
       - name: Android Shell settings tests
         working-directory: app
         run: flutter test --no-pub test/phone/android_shell
+
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Restore runtime downloads
         id: runtime-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -65,12 +75,56 @@ jobs:
           restore-keys: runtime-downloads-v1-
       - name: Build bundled arm64 runtime
         run: runtime/build-runtime.sh arm64-v8a
+      - name: Verify the runtime
+        run: python3 -I tooling/check_runtime_bundle.py arm64
       - name: Save runtime downloads
         if: steps.runtime-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: runtime/.cache
           key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fork-build-runtime-arm64
+          path: |
+            runtime/out/arm64-v8a
+            !runtime/out/arm64-v8a/debug/**
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  arm64:
+    needs: [checks, runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      DSH_MAVEN_MIRRORS: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: '9.3.1'
+      - name: Configure Flutter and Android
+        working-directory: app
+        run: |
+          flutter pub get --enforce-lockfile
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
+          gradle --project-dir android wrapper --gradle-version 9.3.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: fork-build-runtime-arm64
+          path: runtime/out/arm64-v8a
       - name: Install the pinned NDK
         run: |
           ndk="$(jq -r .ndkVersion runtime/tawcroot/source.json)"
