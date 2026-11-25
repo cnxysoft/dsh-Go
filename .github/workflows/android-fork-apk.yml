@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 25
     env:
       DSH_MAVEN_MIRRORS: 0
-      DSH_TEST_FONT_DIR: ${{ runner.temp }}/dsh-test-fonts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -51,10 +50,13 @@ jobs:
           --tests '*.PhoneAndroidShellTest' --tests '*.phone.shell.*' --tests '*.RootBackendTest'
       - name: Install widget-test fonts
         run: |
-          mkdir -p "$DSH_TEST_FONT_DIR"
+          dir="$RUNNER_TEMP/dsh-test-fonts"
+          mkdir -p "$dir"
+          base=https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTC
           for face in Light Regular Bold; do
-            curl --fail --silent --show-error --location --retry 2 --max-time 60               "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTC/NotoSansCJK-$face.ttc"               -o "$DSH_TEST_FONT_DIR/NotoSansCJK-$face.ttc"
+            curl -fLsS --retry 2 --max-time 60 "$base/NotoSansCJK-$face.ttc" -o "$dir/NotoSansCJK-$face.ttc"
           done
+          echo "DSH_TEST_FONT_DIR=$dir" >> "$GITHUB_ENV"
       - name: Android Shell settings tests
         working-directory: app
         run: flutter test --no-pub test/phone/android_shell
