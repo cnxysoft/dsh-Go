@@ -1,5 +1,6 @@
 package io.github.ccch1mneyyy.dsh_app.phone
 
+import io.github.ccch1mneyyy.dsh_app.phone.shell.ShellProtocol
 import io.github.ccch1mneyyy.dsh_app.i18n.AppStrings
 import io.github.ccch1mneyyy.dsh_app.R
 import io.github.ccch1mneyyy.dsh_app.phone.background.BackgroundPreview
@@ -205,7 +206,7 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                 val args = call.arguments as? Map<*, *>
                 val enabled = args?.get("enabled") as? Boolean
                 val backend = args?.get("backend") as? String
-                if (args?.keys != setOf("enabled", "backend") || enabled == null || backend !in io.github.ccch1mneyyy.dsh_app.phone.shell.ShellProtocol.backends) {
+                if (args?.keys != setOf("enabled", "backend") || enabled == null || backend !in ShellProtocol.backends) {
                     result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
                 } else if (enabled && !control.isEnabled()) {
                     result.success(mapOf("ok" to false, "errorCode" to "disabled"))
