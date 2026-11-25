@@ -62,7 +62,8 @@ import 'app_localizations_zh.dart';
 /// be consistent with the languages listed in the L10n.supportedLocales
 /// property.
 abstract class L10n {
-  L10n(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  L10n(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -82,15 +83,19 @@ abstract class L10n {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[Locale('en'), Locale('zh')];
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('zh'),
+  ];
 
   /// No description provided for @a11yRestoreTitle.
   ///
@@ -2766,7 +2771,11 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'{title} {detail}，用时 {duration}'**
-  String activityTraceSpanSemantics(String title, String detail, String duration);
+  String activityTraceSpanSemantics(
+    String title,
+    String detail,
+    String duration,
+  );
 
   /// No description provided for @activityTraceGroupSemantics.
   ///
@@ -3095,7 +3104,7 @@ abstract class L10n {
   /// No description provided for @androidShellSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'通过 Shizuku 或自连 ADB 在这台手机上执行 Android 系统命令，不是 Ubuntu 里的 bash。'**
+  /// **'通过 Shizuku、自连 ADB 或直连 Root 执行本机 Android 系统命令，不是 Ubuntu 内的 bash。'**
   String get androidShellSubtitle;
 
   /// No description provided for @androidShellEnable.
@@ -3475,6 +3484,60 @@ abstract class L10n {
   /// In zh, this message translates to:
   /// **'未能确认操作结果。先核实结果；已派发的命令不要自动重试。'**
   String get androidShellErrorUnknown;
+
+  /// No description provided for @androidShellRoot.
+  ///
+  /// In zh, this message translates to:
+  /// **'直连 Root（su）'**
+  String get androidShellRoot;
+
+  /// No description provided for @androidShellRootConnect.
+  ///
+  /// In zh, this message translates to:
+  /// **'申请并连接 Root'**
+  String get androidShellRootConnect;
+
+  /// No description provided for @androidShellRootHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'需在 Magisk、KernelSU 或 APatch 中允许本应用。如未弹授权框，请到管理器里授权后重试。UID 0 命令必须逐条确认。'**
+  String get androidShellRootHint;
+
+  /// No description provided for @androidShellRootRiskTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'以 Root 身份直连？'**
+  String get androidShellRootRiskTitle;
+
+  /// No description provided for @androidShellRootRiskBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'获准的命令以 Android UID 0 运行，可以读写私有数据、修改系统，或创建本应用无法访问的文件。仅允许你看得懂且信任的命令。Ubuntu bash 不会因此获得 Android Root。'**
+  String get androidShellRootRiskBody;
+
+  /// No description provided for @androidShellRootNotConnected.
+  ///
+  /// In zh, this message translates to:
+  /// **'请在本页手动连接 Root；AI 不能启动或重连。'**
+  String get androidShellRootNotConnected;
+
+  /// No description provided for @androidShellRootUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'未找到可执行的 su。请确认 Root 已安装，且管理器允许本应用看到 su。'**
+  String get androidShellRootUnavailable;
+
+  /// No description provided for @androidShellRootStartFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'未能启动 Root 辅助进程。请在 Root 管理器中允许本应用后重试；Android 或 SELinux 策略仍可能拦截。'**
+  String get androidShellRootStartFailed;
+
+  /// No description provided for @androidShellRootTimeout.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待 Root 授权超时。请在 Root 管理器中允许本应用后重新连接。'**
+  String get androidShellRootTimeout;
 
   /// No description provided for @androidBackgroundProtectionTitle.
   ///
@@ -8304,7 +8367,13 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'{title}\n{objective}\n{status} · 第 {rounds}/{max} 轮'**
-  String chatCommandGoalSummary(String title, String objective, String status, int rounds, int max);
+  String chatCommandGoalSummary(
+    String title,
+    String objective,
+    String status,
+    int rounds,
+    int max,
+  );
 
   /// No description provided for @chatCommandFailed.
   ///
@@ -12633,7 +12702,11 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'查看了 {entries} 项，其中 {supported} 份是所选格式，找到 {matches} 份符合日期的稿件。'**
-  String companionFindCoverage(String entries, String supported, String matches);
+  String companionFindCoverage(
+    String entries,
+    String supported,
+    String matches,
+  );
 
   /// No description provided for @companionFindEnumerationComplete.
   ///
@@ -13047,7 +13120,12 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'修改这次对稿：{deadline}；{exit}；{queue}；{inputs}。两个原文件都别动。'**
-  String companionCompareAmendSource(String deadline, String exit, String queue, String inputs);
+  String companionCompareAmendSource(
+    String deadline,
+    String exit,
+    String queue,
+    String inputs,
+  );
 
   /// No description provided for @companionCompareChooseAgain.
   ///
@@ -17368,13 +17446,21 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'每月 {days} 日且{weekdays}{months}'**
-  String featuresCronMonthDaysAndWeekdays(String days, String weekdays, String months);
+  String featuresCronMonthDaysAndWeekdays(
+    String days,
+    String weekdays,
+    String months,
+  );
 
   /// No description provided for @featuresCronMonthDaysOrWeekdays.
   ///
   /// In zh, this message translates to:
   /// **'每月 {days} 日或{weekdays}{months}'**
-  String featuresCronMonthDaysOrWeekdays(String days, String weekdays, String months);
+  String featuresCronMonthDaysOrWeekdays(
+    String days,
+    String weekdays,
+    String months,
+  );
 
   /// No description provided for @featuresCronHourRange.
   ///
@@ -18592,7 +18678,12 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'更新 Agent 预设「{name}」（{id}）：在工作区写下这两个文件（内容原样），用 plugin_manager 先移除组合包 `{replacing}`，再用 install_bundle 安装 `{directory}` 目录。只做这些。\n\n'**
-  String featuresPresetUpdateRequest(String name, String id, String replacing, String directory);
+  String featuresPresetUpdateRequest(
+    String name,
+    String id,
+    String replacing,
+    String directory,
+  );
 
   /// No description provided for @featuresZoneThisPhone.
   ///
@@ -29398,7 +29489,10 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'需要 DSH {requiredVersion}，当前 {currentVersion}，未加载'**
-  String pluginsRequiresDshVersion(String requiredVersion, String currentVersion);
+  String pluginsRequiresDshVersion(
+    String requiredVersion,
+    String currentVersion,
+  );
 
   /// No description provided for @pluginsLoadFailure.
   ///
@@ -31348,7 +31442,12 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'{mode}：{before} 已校正为 {after}，对比度至少 {minimum}:1'**
-  String plugViewContrastAdjusted(String mode, String before, String after, String minimum);
+  String plugViewContrastAdjusted(
+    String mode,
+    String before,
+    String after,
+    String minimum,
+  );
 
   /// No description provided for @plugViewRichLimit.
   ///
@@ -33814,7 +33913,11 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'确认主机重装或更换后，可在主机设置中重置指纹。\n已记住：{saved}\n这次收到：{received}（{type}）'**
-  String remoteHostKeyMismatchDetail(String saved, String received, String type);
+  String remoteHostKeyMismatchDetail(
+    String saved,
+    String received,
+    String type,
+  );
 
   /// No description provided for @remoteForumCompactReplies.
   ///
@@ -40588,7 +40691,11 @@ abstract class L10n {
   ///
   /// In zh, this message translates to:
   /// **'换用{registry}下载（第 {attempt}/{attempts} 个源）'**
-  String statePluginRegistryProgress(String registry, int attempt, int attempts);
+  String statePluginRegistryProgress(
+    String registry,
+    int attempt,
+    int attempts,
+  );
 
   /// No description provided for @stateProviderServiceUnavailable.
   ///
@@ -53980,7 +54087,8 @@ class _L10nDelegate extends LocalizationsDelegate<L10n> {
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'zh'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['en', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_L10nDelegate old) => false;

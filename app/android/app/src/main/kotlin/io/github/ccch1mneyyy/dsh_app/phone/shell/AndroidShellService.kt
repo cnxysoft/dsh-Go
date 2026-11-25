@@ -90,11 +90,13 @@ class AndroidShellService(context: Context) : IAndroidShell.Stub() {
     }
 }
 
-/** Self-ADB stdin/stdout control channel; EOF is an owned-process cancellation, not detachment. */
+/** Private ADB/su pipes; EOF is an owned-process cancellation, not detachment. */
 @androidx.annotation.Keep
 object AndroidShellMain {
     @JvmStatic
     fun main(args: Array<String>) {
+        // The root entry point must not even initialize a job host if su yielded shell/app UID.
+        if (args.contentEquals(arrayOf("root")) && Process.myUid() != 0) exitProcess(126)
         val host = ShellHost(System.getenv("CLASSPATH") ?: System.getProperty("java.class.path"))
         val output = FileOutputStream(FileDescriptor.out)
         try {

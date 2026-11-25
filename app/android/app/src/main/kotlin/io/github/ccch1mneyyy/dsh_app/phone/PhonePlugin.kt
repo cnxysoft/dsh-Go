@@ -205,7 +205,7 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                 val args = call.arguments as? Map<*, *>
                 val enabled = args?.get("enabled") as? Boolean
                 val backend = args?.get("backend") as? String
-                if (args?.keys != setOf("enabled", "backend") || enabled == null || backend !in setOf("shizuku", "adb")) {
+                if (args?.keys != setOf("enabled", "backend") || enabled == null || backend !in io.github.ccch1mneyyy.dsh_app.phone.shell.ShellProtocol.backends) {
                     result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
                 } else if (enabled && !control.isEnabled()) {
                     result.success(mapOf("ok" to false, "errorCode" to "disabled"))
@@ -226,7 +226,13 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                 val port = args?.get("port") as? Int
                 if (call.arguments != null && (args == null || args.keys.any { it != "port" } ||
                     args["port"] != null && port == null)) result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
-                else async(result) { control.shell.connect(port) }
+                else async(result) {
+                    when {
+                        !control.isEnabled() -> mapOf("ok" to false, "errorCode" to "disabled")
+                        control.isLocked() -> mapOf("ok" to false, "errorCode" to "locked")
+                        else -> control.shell.connect(port)
+                    }
+                }
             }
             "androidShellStop" -> { control.shell.cancelAll(); result.success(true) }
             "acknowledgeTaskInterruption" -> async(result) {

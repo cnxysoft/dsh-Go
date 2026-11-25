@@ -39,7 +39,7 @@ class PhoneAndroidShellTest {
             beforeConfirm()
             val decision = confirm(backend, uid)
             afterConfirm()
-            val error = PhoneAndroidShell.confirmationError(decision)
+            val error = PhoneAndroidShell.confirmationError(decision, uid)
             if (!stillWanted()) PhoneAndroidShell.failure("cancelled")
             else if (error != null) PhoneAndroidShell.failure(error)
             else { dispatches++; result }
@@ -197,6 +197,21 @@ class PhoneAndroidShellTest {
         }
     }
 
+    @Test fun actualRootAlwaysAsksAndRejectsRoundApprovalOnBothChannels() {
+        for (backend in listOf("root", "shizuku")) Fixture().use { f ->
+            f.decision = Decision.ALLOW_APP_FOR_TASK
+            assertFalse(f.call().isError) // Existing non-root turn approval cannot carry into Root.
+            f.backend = backend
+            f.uid = 0
+            assertTrue(f.call().isError) // Even a gate erroneously returning a round approval cannot dispatch.
+            f.decision = Decision.ALLOW_ONCE
+            repeat(2) { assertFalse(f.call().isError) }
+            assertEquals(4, f.asks.size)
+            assertTrue(f.asks.drop(1).none { it.allowRound })
+            assertEquals(3, f.dispatches)
+        }
+    }
+
     @Test fun unavailableUserGateOrBackendDoesNotDispatch() {
         Fixture().use { f ->
             f.gateAvailable = false
@@ -242,10 +257,10 @@ class PhoneAndroidShellTest {
 
     @Test fun backendAndActualUidMustBeRecognizedBeforeAsking() {
         for ((backend, uid) in listOf("adb" to 2000, "shizuku" to 0, "shizuku" to 2000,
-                "adb" to 0, "adb" to 10000, "shizuku" to -1, "unknown" to 0)) Fixture().use { f ->
+                "root" to 0, "root" to 2000, "adb" to 0, "adb" to 10000, "shizuku" to -1, "unknown" to 0)) Fixture().use { f ->
             f.backend = backend
             f.uid = uid
-            val valid = (backend == "adb" && uid == 2000) || (backend == "shizuku" && uid in setOf(0, 2000))
+            val valid = (backend == "root" && uid == 0) || (backend == "adb" && uid == 2000) || (backend == "shizuku" && uid in setOf(0, 2000))
             assertEquals(!valid, f.call().isError)
             assertEquals(if (valid) 1 else 0, f.asks.size)
             assertEquals(if (valid) 1 else 0, f.dispatches)

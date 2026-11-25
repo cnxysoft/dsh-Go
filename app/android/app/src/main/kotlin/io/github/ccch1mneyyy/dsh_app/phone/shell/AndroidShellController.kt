@@ -3,6 +3,8 @@ package io.github.ccch1mneyyy.dsh_app.phone.shell
 import android.content.Context
 import io.github.ccch1mneyyy.dsh_app.phone.Decision
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneAndroidShell
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -12,9 +14,10 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     private val preferences = this.context.getSharedPreferences("android-shell-v1", Context.MODE_PRIVATE)
     private val guard = Any()
     private var enabled = preferences.getBoolean("enabled", false)
-    private var backend = preferences.getString("backend", "shizuku").takeIf { it == "adb" || it == "shizuku" } ?: "shizuku"
+    private var backend = preferences.getString("backend", "shizuku").takeIf { it in ShellProtocol.backends } ?: "shizuku"
     private var generation = 0L
     private var setupBusy = false
+    private var pendingRoot: ShellLink? = null
     private var active: Lease? = null
     @Volatile private var readyLink: ShellLink? = null
     private val adb = ShellAdbBackend(this.context, onChanged)
@@ -40,6 +43,7 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             config.second == "shizuku" && shizukuStatus["running"] != true -> "shizukuStopped"
             config.second == "shizuku" && shizukuStatus["granted"] != true -> "permissionRequired"
             config.second == "adb" && adbStatus["paired"] != true -> "adbNotPaired"
+            config.second == "root" -> "rootNotConnected"
             else -> "notConnected"
         }
         return mapOf(
@@ -53,12 +57,12 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     }
 
     fun configure(enabled: Boolean, backend: String): Map<String, Any?> {
-        if (backend != "shizuku" && backend != "adb") return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        if (backend !in ShellProtocol.backends) return mapOf("ok" to false, "errorCode" to "invalidArguments")
         val changed = synchronized(guard) {
             if (this.enabled == enabled && this.backend == backend) false else {
                 this.enabled = enabled; this.backend = backend; ++generation
                 active?.cancelled = true
-                readyLink = null
+                clearLinksLocked()
                 preferences.edit().putBoolean("enabled", enabled).putString("backend", backend).apply()
                 true
             }
@@ -88,12 +92,48 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         }
         val wanted = { synchronized(guard) { enabled && generation == selection.first && backend == selection.second } }
         return try {
-            val connection = connection(selection.second, port, wanted)
+            val connection = if (selection.second == "root") {
+                if (port != null) return mapOf("ok" to false, "errorCode" to "invalidArguments")
+                connectRoot(wanted)
+            } else connection(selection.second, port, wanted)
             val link = connection.link ?: return mapOf("ok" to false, "errorCode" to connection.errorCode)
-            if (!wanted()) { link.close(); return mapOf("ok" to false, "errorCode" to "cancelled") }
-            readyLink = link
+            synchronized(guard) {
+                if (!wanted()) { link.close(); return mapOf("ok" to false, "errorCode" to "cancelled") }
+                readyLink = link
+                if (pendingRoot === link) pendingRoot = null
+            }
             status() + mapOf("ok" to true, "errorCode" to null)
         } finally { synchronized(guard) { setupBusy = false }; onChanged() }
+    }
+
+    private fun connectRoot(wanted: () -> Boolean): ShellConnection {
+        val link = synchronized(guard) {
+            if (!wanted()) return ShellConnection(errorCode = "cancelled")
+            readyLink?.takeIf { it.backend == "root" && it.alive() }?.let { return ShellConnection(it) }
+            readyLink?.close()
+            readyLink = null
+            val opened = ShellRootBackend.open(context)
+            opened.link?.also { pendingRoot = it } ?: return opened
+        }
+        val error = try {
+            if (link.probe(ShellRootBackend.AUTH_TIMEOUT_MS)) null else "identityChanged"
+        } catch (_: SocketTimeoutException) {
+            "rootTimeout"
+        } catch (_: IOException) {
+            "rootStartFailed"
+        }
+        if (error == null && wanted()) return ShellConnection(link)
+        link.close()
+        synchronized(guard) { if (pendingRoot === link) pendingRoot = null }
+        return ShellConnection(errorCode = if (wanted()) error else "cancelled")
+    }
+
+    // Called under guard; close only schedules pipe teardown and never waits for su.
+    private fun clearLinksLocked() {
+        pendingRoot?.close()
+        pendingRoot = null
+        readyLink?.takeIf { it.backend == "root" }?.close()
+        readyLink = null
     }
 
     fun execute(
@@ -122,10 +162,13 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             if (!wanted()) return result(lease, ShellProtocol.failure("cancelled"))
             // Read real UID on this very channel before every confirmation, not from provider status.
             if (!link.probe()) { link.close(); return result(lease, ShellProtocol.failure("identityChanged")) }
-            readyLink = link
+            synchronized(guard) {
+                if (lease.cancelled || generation != lease.generation) return result(lease, ShellProtocol.failure("cancelled"))
+                readyLink = link
+            }
             val decision = confirm(lease.backend, link.uid)
             if (!wanted()) return result(lease, ShellProtocol.failure("cancelled"))
-            PhoneAndroidShell.confirmationError(decision)?.let { return result(lease, ShellProtocol.failure(it)) }
+            PhoneAndroidShell.confirmationError(decision, link.uid)?.let { return result(lease, ShellProtocol.failure(it)) }
             var response = link.call(mapOf("op" to "start", "jobId" to lease.id,
                 "command" to command, "timeoutMs" to timeoutMs, "uid" to link.uid)) {
                 wanted() && synchronized(guard) {
@@ -167,24 +210,34 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         values + mapOf("backend" to lease.backend, "uid" to lease.link?.uid?.takeIf { it >= 0 })
 
     private fun connection(backend: String, port: Int?, wanted: () -> Boolean): ShellConnection =
-        if (backend == "adb") adb.connect(port, wanted) else shizuku.connect(wanted)
+        when (backend) {
+            "adb" -> adb.connect(port, wanted)
+            "shizuku" -> shizuku.connect(wanted)
+            // Tool calls may only reuse the explicitly connected root host, never start su.
+            "root" -> readyLink?.takeIf { it.backend == "root" && it.alive() }?.let { ShellConnection(it) }
+                ?: ShellConnection(errorCode = "rootNotConnected")
+            else -> ShellConnection(errorCode = "invalidArguments")
+        }
 
     fun cancel(ownerId: Long) {
         val lease = synchronized(guard) {
             active?.takeIf { it.ownerId == ownerId }?.also { it.cancelled = true }
         } ?: return
         if (lease.link == null) {
-            if (lease.backend == "adb") adb.disconnect() else shizuku.disconnect()
+            when (lease.backend) {
+                "adb" -> adb.disconnect()
+                "shizuku" -> shizuku.disconnect()
+            }
         } else cancelRemote(lease)
     }
 
     fun cancelAll() {
         val lease = synchronized(guard) {
             ++generation
-            readyLink = null
+            clearLinksLocked()
             active?.also { it.cancelled = true }
         }
-        if (lease != null) cancelRemote(lease)
+        if (lease != null && lease.backend != "root") cancelRemote(lease)
         adb.disconnect(); shizuku.disconnect(); onChanged()
     }
 

@@ -1,5 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.phone
 
+import io.github.ccch1mneyyy.dsh_app.phone.shell.ShellProtocol
+
 /** The native backend is selected only by App settings, never by model arguments. */
 fun interface PhoneShellExecutor {
     fun execute(ownerId: Long, command: String, timeoutMs: Long, stillWanted: () -> Boolean,
@@ -39,8 +41,9 @@ object PhoneAndroidShell {
     )
 
     /** Shell grants are per command; unavailable UI is not a user denial. */
-    fun confirmationError(decision: Decision): String? = when (decision) {
-        Decision.ALLOW_ONCE, Decision.ALLOW_APP_FOR_TASK -> null
+    fun confirmationError(decision: Decision, uid: Int = 2000): String? = when (decision) {
+        Decision.ALLOW_ONCE -> null
+        Decision.ALLOW_APP_FOR_TASK -> if (uid == 0) "confirmationDenied" else null
         Decision.UNAVAILABLE -> "confirmationUnavailable"
         Decision.STOP -> "cancelled"
         else -> "confirmationDenied"
@@ -58,17 +61,17 @@ object PhoneAndroidShell {
         if (executor == null) return failure("unsupported")
         return executor.execute(owner.taskId, request.command, request.timeoutMs, ::live) { backend, uid ->
             if (!live()) Decision.STOP
-            else if (!(backend == "adb" && uid == 2000 || backend == "shizuku" && uid in setOf(0, 2000))) Decision.DENY
-            else if (tasks.hasGrant(null, GRANT)) Decision.ALLOW_ONCE
+            else if (!ShellProtocol.validUid(backend, uid)) Decision.DENY
+            else if (uid != 0 && tasks.hasGrant(null, GRANT)) Decision.ALLOW_ONCE
             else {
                 val prompt = ConfirmRequest(
                     ui.get("phone_shell_confirm",
                         "执行 Android 系统命令（%1\$s，UID %2\$s）。这可能修改系统或应用数据；屏幕操作的免确认不适用：\n\n%3\$s",
                         backend, uid.toString(), request.command), // l10n:keep test default
-                    appLabel = null, packageName = null, firstInApp = false, owner = owner,
+                    appLabel = null, packageName = null, firstInApp = false, allowRound = uid != 0, owner = owner,
                 )
                 val decision = scope.userWait { if (live()) gate()?.confirm(prompt) ?: Decision.UNAVAILABLE else Decision.STOP }
-                if (decision == Decision.ALLOW_APP_FOR_TASK) tasks.confirmIfCurrent(owner, grant = PhoneTasks.grantKey(null, GRANT))
+                if (uid != 0 && decision == Decision.ALLOW_APP_FOR_TASK) tasks.confirmIfCurrent(owner, grant = PhoneTasks.grantKey(null, GRANT))
                 if (live()) decision else Decision.STOP
             }
         }

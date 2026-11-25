@@ -91,6 +91,22 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('direct Root only connects after the explicit risk notice', (tester) async {
+    final native = await _pump(
+      tester,
+      native: ShellNative(status: shellStatus(enabled: true, backend: 'root', reasonCode: 'rootNotConnected')),
+    );
+    expect(native.calls.map((call) => call.method), ['androidShellStatus']);
+    expect(find.byKey(const ValueKey('android-shell-authorize')), findsNothing);
+    expect(find.byKey(const ValueKey('android-shell-pair')), findsNothing);
+    await _tap(tester, 'android-shell-connect-root');
+    expect(find.text(appL10n.androidShellRootRiskTitle), findsOneWidget);
+    expect(native.callsOf('androidShellConnect'), isEmpty);
+    await tester.tap(find.text(appL10n.androidShellRootConnect).last);
+    await tester.pumpAndSettle();
+    expect(native.callsOf('androidShellConnect').single.arguments, isEmpty);
+  });
+
   testWidgets('only the needed authorization or connection step is shown', (tester) async {
     final native = await _pump(tester);
     expect(find.byKey(const ValueKey('android-shell-authorize')), findsOneWidget);

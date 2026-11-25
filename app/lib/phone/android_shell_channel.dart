@@ -1,31 +1,42 @@
 import 'package:flutter/services.dart';
 
-Map<Object?, Object?> _map(Object? value) => value is Map ? value.cast<Object?, Object?>() : const {};
+Map<Object?, Object?> _map(Object? value) =>
+    value is Map ? value.cast<Object?, Object?>() : const {};
 
 String? _code(Object? value) =>
-    value is String && RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{0,63}$').hasMatch(value) ? value : null;
+    value is String && RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{0,63}$').hasMatch(value)
+    ? value
+    : null;
 
-int? _nonNegativeInt(Object? value) => value is int && value >= 0 ? value : null;
+int? _nonNegativeInt(Object? value) =>
+    value is int && value >= 0 ? value : null;
 
 enum AndroidShellBackend {
   shizuku,
-  adb;
+  adb,
+  root;
 
   static AndroidShellBackend? parse(Object? value) => switch (value) {
     'shizuku' => shizuku,
     'adb' => adb,
+    'root' => root,
     _ => null,
   };
 }
 
 class AndroidShellShizukuStatus {
-  const AndroidShellShizukuStatus({this.installed = false, this.running = false, this.granted = false});
+  const AndroidShellShizukuStatus({
+    this.installed = false,
+    this.running = false,
+    this.granted = false,
+  });
 
-  factory AndroidShellShizukuStatus.fromMap(Map<Object?, Object?> value) => AndroidShellShizukuStatus(
-    installed: value['installed'] == true,
-    running: value['running'] == true,
-    granted: value['granted'] == true,
-  );
+  factory AndroidShellShizukuStatus.fromMap(Map<Object?, Object?> value) =>
+      AndroidShellShizukuStatus(
+        installed: value['installed'] == true,
+        running: value['running'] == true,
+        granted: value['granted'] == true,
+      );
 
   final bool installed;
   final bool running;
@@ -36,7 +47,10 @@ class AndroidShellAdbStatus {
   const AndroidShellAdbStatus({this.paired = false, this.connected = false});
 
   factory AndroidShellAdbStatus.fromMap(Map<Object?, Object?> value) =>
-      AndroidShellAdbStatus(paired: value['paired'] == true, connected: value['connected'] == true);
+      AndroidShellAdbStatus(
+        paired: value['paired'] == true,
+        connected: value['connected'] == true,
+      );
 
   final bool paired;
   final bool connected;
@@ -63,7 +77,9 @@ class AndroidShellStatus {
       return const AndroidShellStatus.unavailable('protocolMismatch');
     }
     final backend = AndroidShellBackend.parse(value['backend']);
-    if (backend == null || value['enabled'] is! bool || value['ready'] is! bool) {
+    if (backend == null ||
+        value['enabled'] is! bool ||
+        value['ready'] is! bool) {
       return const AndroidShellStatus.unavailable('invalidResponse');
     }
     final limits = _map(value['limits']);
@@ -77,7 +93,12 @@ class AndroidShellStatus {
       shizuku: AndroidShellShizukuStatus.fromMap(_map(value['shizuku'])),
       adb: AndroidShellAdbStatus.fromMap(_map(value['adb'])),
       limits: Map.unmodifiable({
-        for (final key in const ['defaultTimeoutMs', 'maxTimeoutMs', 'maxOutputBytes', 'maxCommandBytes'])
+        for (final key in const [
+          'defaultTimeoutMs',
+          'maxTimeoutMs',
+          'maxOutputBytes',
+          'maxCommandBytes',
+        ])
           key: ?_nonNegativeInt(limits[key]),
       }),
     );
@@ -99,7 +120,10 @@ class AndroidShellResult {
 
   factory AndroidShellResult.fromMap(Map<Object?, Object?> value) {
     if (value['ok'] == true) return const AndroidShellResult(true);
-    return AndroidShellResult(false, errorCode: _code(value['errorCode']) ?? 'invalidResponse');
+    return AndroidShellResult(
+      false,
+      errorCode: _code(value['errorCode']) ?? 'invalidResponse',
+    );
   }
 
   final bool ok;
@@ -117,31 +141,47 @@ class AndroidShellChannel {
   Future<AndroidShellStatus> status() async {
     try {
       final value = await _channel.invokeMethod<Object?>('androidShellStatus');
-      if (value is! Map) return const AndroidShellStatus.unavailable('invalidResponse');
+      if (value is! Map)
+        return const AndroidShellStatus.unavailable('invalidResponse');
       return AndroidShellStatus.fromMap(value.cast<Object?, Object?>());
     } on MissingPluginException {
       return const AndroidShellStatus.unavailable('nativeUnavailable');
     } on PlatformException catch (error) {
-      return AndroidShellStatus.unavailable(_code(error.code) ?? 'invalidResponse');
+      return AndroidShellStatus.unavailable(
+        _code(error.code) ?? 'invalidResponse',
+      );
     }
   }
 
-  Future<AndroidShellResult> configure({required bool enabled, required AndroidShellBackend backend}) =>
-      _result('configureAndroidShell', {'enabled': enabled, 'backend': backend.name});
+  Future<AndroidShellResult> configure({
+    required bool enabled,
+    required AndroidShellBackend backend,
+  }) => _result('configureAndroidShell', {
+    'enabled': enabled,
+    'backend': backend.name,
+  });
 
   Future<bool> requestPermission() => _bool('androidShellRequestPermission');
 
-  Future<AndroidShellResult> startPairing() => _result('androidShellStartPairing');
+  Future<AndroidShellResult> startPairing() =>
+      _result('androidShellStartPairing');
 
   Future<AndroidShellResult> pair(String code, {int? port}) {
-    if (code.length != 6 || !RegExp(r'^[0-9]{6}$').hasMatch(code) || !_validPort(port)) {
-      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    if (code.length != 6 ||
+        !RegExp(r'^[0-9]{6}$').hasMatch(code) ||
+        !_validPort(port)) {
+      return Future.value(
+        const AndroidShellResult(false, errorCode: 'invalidArguments'),
+      );
     }
     return _result('androidShellPair', {'code': code, 'port': ?port});
   }
 
   Future<AndroidShellResult> connect({int? port}) {
-    if (!_validPort(port)) return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    if (!_validPort(port))
+      return Future.value(
+        const AndroidShellResult(false, errorCode: 'invalidArguments'),
+      );
     return _result('androidShellConnect', {'port': ?port});
   }
 
@@ -149,14 +189,20 @@ class AndroidShellChannel {
 
   bool _validPort(int? port) => port == null || (port >= 1 && port <= 65535);
 
-  Future<AndroidShellResult> _result(String method, [Map<String, Object?>? arguments]) async {
+  Future<AndroidShellResult> _result(
+    String method, [
+    Map<String, Object?>? arguments,
+  ]) async {
     try {
       final value = await _channel.invokeMethod<Object?>(method, arguments);
       return AndroidShellResult.fromMap(_map(value));
     } on MissingPluginException {
       return const AndroidShellResult(false, errorCode: 'nativeUnavailable');
     } on PlatformException catch (error) {
-      return AndroidShellResult(false, errorCode: _code(error.code) ?? 'invalidResponse');
+      return AndroidShellResult(
+        false,
+        errorCode: _code(error.code) ?? 'invalidResponse',
+      );
     }
   }
 

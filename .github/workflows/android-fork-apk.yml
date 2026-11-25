@@ -1,0 +1,63 @@
+name: Android fork APK
+
+on:
+  push:
+    branches: [codex/android-direct-root]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-fork-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      DSH_MAVEN_MIRRORS: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          gradle-version: '9.3.1'
+      - name: Configure Flutter and Android
+        working-directory: app
+        run: |
+          flutter pub get --enforce-lockfile
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
+          gradle --project-dir android wrapper --gradle-version 9.3.1
+          python3 tool/l10n_merge.py --check
+          python3 tool/guide_sync.py --check
+      - name: Android Shell and Root native tests
+        working-directory: app/android
+        run: >-
+          ./gradlew --stacktrace :app:testArm64DebugUnitTest -x :app:compileFlutterBuildArm64Debug
+          --tests '*.PhoneAndroidShellTest' --tests '*.phone.shell.*' --tests '*.RootBackendTest'
+      - name: Android Shell settings tests
+        working-directory: app
+        run: flutter test --no-pub test/phone/android_shell
+      - name: Build bundled arm64 runtime
+        run: runtime/build-runtime.sh arm64-v8a
+      - name: Build isolated arm64 APK
+        run: tooling/build-apk.sh --side --no-companion --keep-daemon
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dsh-go-direct-root-arm64
+          path: app/build/app/outputs/flutter-apk/app-arm64-release.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

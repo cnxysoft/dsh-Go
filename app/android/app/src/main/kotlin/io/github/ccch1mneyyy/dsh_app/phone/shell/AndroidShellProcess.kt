@@ -107,6 +107,8 @@ object AndroidShellJobMain {
             killOwnedGroup()
         }, "dsh-shell-parent-watch").apply { isDaemon = true; start() }
         val child = ProcessBuilder("/system/bin/sh", "-c", args[1]).apply {
+            // A root command never implicitly inherits the app/guest's private working directory.
+            if (Process.myUid() == 0) directory(File("/"))
             environment().clear()
             environment().putAll(shellEnvironment())
         }

@@ -54,7 +54,8 @@ class RootStarter(private val context: Context, private val onChanged: () -> Uni
         if (!stillAccepted) { onChanged(); return@start null }
         val info = context.applicationInfo
         val process = try {
-            RootProcess.launch(RootCommands.appProcess(info.sourceDir, info.splitSourceDirs?.toList().orEmpty()))
+            val su = RootCommands.findSu() ?: throw IOException("rootStartFailed")
+            RootProcess.launch(RootCommands.appProcess(su, info.sourceDir, info.splitSourceDirs.orEmpty().toList()))
         } catch (error: Exception) {
             synchronized(guard) { if (state.current(ticket)) { pendingAllowed = null; state.finish(ticket, reason(error)) } }
             onChanged()

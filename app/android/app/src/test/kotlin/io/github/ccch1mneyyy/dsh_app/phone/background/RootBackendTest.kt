@@ -9,10 +9,15 @@ import java.util.concurrent.atomic.AtomicReference
 
 class RootBackendTest {
     @Test fun commandHasOneShellArgumentAndFixedEntrypoint() {
-        val argv = RootCommands.appProcess("/data/app/base.apk", listOf("/data/app/split.apk"))
+        val argv = RootCommands.appProcess("/system/bin/su", "/data/app/base.apk", listOf("/data/app/split.apk"))
         assertEquals(3, argv.size)
-        assertEquals(listOf("su", "-c"), argv.take(2))
-        assertEquals("CLASSPATH='/data/app/base.apk:/data/app/split.apk' exec /system/bin/app_process /system/bin io.github.ccch1mneyyy.dsh_app.phone.background.PrivilegedDisplayMain", argv[2])
+        assertEquals(listOf("/system/bin/su", "-c"), argv.take(2))
+        assertEquals("cd / && CLASSPATH='/data/app/base.apk:/data/app/split.apk' exec /system/bin/app_process /system/bin io.github.ccch1mneyyy.dsh_app.phone.background.PrivilegedDisplayMain", argv[2])
+    }
+    @Test fun suSearchUsesOnlyTheKnownExecutablePaths() {
+        assertEquals("/system/bin/su", RootCommands.findSu { true })
+        assertEquals("/data/adb/ksu/bin/su", RootCommands.findSu { it == "/data/adb/ksu/bin/su" })
+        assertNull(RootCommands.findSu { false })
     }
     @Test fun shellQuotesOsPathsWithoutExecutingTheirContents() {
         val marker = File.createTempFile("root-command-", ".must-not-exist").apply { delete() }

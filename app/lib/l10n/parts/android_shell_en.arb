@@ -1,7 +1,7 @@
 {
   "androidShellTitle": "Android Shell",
   "androidShellEntryHint": "Separate system-command channel, off by default",
-  "androidShellSubtitle": "Run Android system commands on this phone through Shizuku or self-ADB, not bash inside Ubuntu.",
+  "androidShellSubtitle": "Run Android system commands on this phone through Shizuku, self-ADB or direct Root, not bash inside Ubuntu.",
   "androidShellEnable": "Allow Android Shell",
   "androidShellEnableHint": "A separate switch, independent of non-disruptive mode and screen confirmation. It only adds an Android command channel; Ubuntu tools such as bash and run_code keep working, and both can be used together.",
   "androidShellConfirmationNote": "Every command needs confirmation and may change system settings and files.",
@@ -81,5 +81,14 @@
   "androidShellErrorInvalidResponse": "No valid native status was received. Refresh or update the app.",
   "androidShellErrorStopped": "This round has ended or is paused. Turn it on again and retry.",
   "androidShellErrorStopFailed": "Stopping was not confirmed. Refresh the status and retry stopping.",
-  "androidShellErrorUnknown": "The outcome could not be confirmed. Verify it first; never automatically retry a dispatched command."
+  "androidShellErrorUnknown": "The outcome could not be confirmed. Verify it first; never automatically retry a dispatched command.",
+  "androidShellRoot": "Direct Root (su)",
+  "androidShellRootConnect": "Authorize and connect Root",
+  "androidShellRootHint": "Magisk, KernelSU or APatch must allow this app. If no prompt appears, grant it in the manager and retry. Each UID 0 command requires its own confirmation.",
+  "androidShellRootRiskTitle": "Connect directly as Root?",
+  "androidShellRootRiskBody": "An approved command runs as Android UID 0. It can read or corrupt private data, change the system, or leave files this app cannot access. Only authorize commands you understand. Ubuntu bash stays unprivileged on Android.",
+  "androidShellRootNotConnected": "Connect Root explicitly from this page. The AI cannot start or reconnect it.",
+  "androidShellRootUnavailable": "No usable su was found. Check that Root is installed and visible to this app in your Root manager.",
+  "androidShellRootStartFailed": "Could not start the Root helper. Allow this app in your Root manager and retry. Android or SELinux policy may still block the helper.",
+  "androidShellRootTimeout": "Root authorization timed out. Allow this app in your Root manager and reconnect."
 }
