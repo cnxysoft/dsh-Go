@@ -3107,7 +3107,7 @@ abstract class L10n {
   /// No description provided for @androidShellRestoreOnOpen.
   ///
   /// In zh, this message translates to:
-  /// **'打开 Go 时重连'**
+  /// **'打开 DSH Go 时重连'**
   String get androidShellRestoreOnOpen;
 
   /// No description provided for @androidShellRestoreOnOpenHint.

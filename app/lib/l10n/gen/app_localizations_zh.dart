@@ -1640,7 +1640,7 @@ class L10nZh extends L10n {
   String get androidShellEnable => '允许 Android Shell';
 
   @override
-  String get androidShellRestoreOnOpen => '打开 Go 时重连';
+  String get androidShellRestoreOnOpen => '打开 DSH Go 时重连';
 
   @override
   String get androidShellRestoreOnOpenHint => '先手动连通一次。下次冷启动只尝试一次；停止或更换通道会关闭此项。不会记住命令授权。';

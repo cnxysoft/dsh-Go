@@ -49,11 +49,7 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
             }
         }
         override fun onActivityResumed(host: Activity) {
-            if (activity?.activity === host) {
-                hostResumed = true
-                attachPreviewConsumer()
-                io.execute { if (attached && hostResumed && control.isEnabled() && !control.isLocked()) control.shell.restoreOnOpen() }
-            }
+            if (activity?.activity === host) onHostResumed()
         }
         override fun onActivityCreated(host: Activity, state: Bundle?) {}
         override fun onActivityStarted(host: Activity) {}
@@ -145,7 +141,13 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
         binding.addOnNewIntentListener(this)
         control.prompts.attachActivity(promptOwner, binding.activity)
         control.prompts.handleOpenIntent(binding.activity.intent)
+        if (AppVisibility.isResumed(binding.activity)) onHostResumed() else attachPreviewConsumer()
+    }
+
+    private fun onHostResumed() {
+        hostResumed = true
         attachPreviewConsumer()
+        io.execute { if (attached && hostResumed && control.isEnabled() && !control.isLocked()) control.shell.restoreOnOpen() }
     }
 
     override fun onDetachedFromActivityForConfigChanges() = onDetachedFromActivity()
@@ -233,12 +235,12 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
             }
             "androidShellRestoreOnOpen" -> {
                 val value = (call.arguments as? Map<*, *>)?.get("enabled") as? Boolean
-                result.success(when {
-                    value == null -> mapOf("ok" to false, "errorCode" to "invalidArguments")
-                    value && !control.isEnabled() -> mapOf("ok" to false, "errorCode" to "disabled")
-                    value && control.isLocked() -> mapOf("ok" to false, "errorCode" to "locked")
-                    else -> control.shell.setRestoreOnOpen(value)
-                })
+                when {
+                    value == null -> result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
+                    value && !control.isEnabled() -> result.success(mapOf("ok" to false, "errorCode" to "disabled"))
+                    value && control.isLocked() -> result.success(mapOf("ok" to false, "errorCode" to "locked"))
+                    else -> async(result, shortControl = true) { control.shell.setRestoreOnOpen(value) }
+                }
             }
             "androidShellRequestPermission" -> async(result) { control.shell.requestShizukuPermission() }
             "androidShellStartPairing" -> async(result) { control.shell.startAdbPairing() }

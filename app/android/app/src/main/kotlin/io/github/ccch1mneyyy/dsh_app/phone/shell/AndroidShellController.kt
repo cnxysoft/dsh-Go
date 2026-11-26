@@ -69,7 +69,7 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
                 this.enabled = enabled; this.backend = backend; ++generation
                 active?.cancelled = true
                 clearLinksLocked()
-                preferences.edit().remove("restoreOnOpen").putBoolean("enabled", enabled).putString("backend", backend).apply()
+                preferences.edit().remove("restoreOnOpen").putBoolean("enabled", enabled).putString("backend", backend).commit()
                 true
             }
         }
@@ -93,7 +93,7 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     // Opt in only for the already verified transport. Never persist a command grant.
     fun setRestoreOnOpen(value: Boolean): Map<String, Any?> = synchronized(guard) {
         if (value && (!enabled || readyLink?.alive() != true)) return mapOf("ok" to false, "errorCode" to "notConnected")
-        preferences.edit().putBoolean("restoreOnOpen", value).apply()
+        preferences.edit().putBoolean("restoreOnOpen", value).commit()
         restoreError = null
         restorePending = false
         mapOf("ok" to true)
@@ -246,6 +246,18 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         val lease = synchronized(guard) {
             active?.takeIf { it.ownerId == ownerId }?.also { it.cancelled = true }
         } ?: return
+        cancelLease(lease)
+    }
+
+    /** Stops any in-flight command without tearing down an idle or restoring transport. */
+    fun cancelActive() {
+        val lease = synchronized(guard) {
+            active?.also { it.cancelled = true }
+        } ?: return
+        cancelLease(lease)
+    }
+
+    private fun cancelLease(lease: Lease) {
         if (lease.link == null) {
             when (lease.backend) {
                 "adb" -> adb.disconnect()

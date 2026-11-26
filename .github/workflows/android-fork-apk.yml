@@ -132,8 +132,57 @@ jobs:
           ndk="$(jq -r .ndkVersion runtime/tawcroot/source.json)"
           if [[ ! -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]]; then sdkmanager "ndk;$ndk"; fi
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ndk" >> "$GITHUB_ENV"
+      - name: Configure optional fork signing
+        env:
+          KEYSTORE_B64: ${{ secrets.DSH_FORK_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.DSH_FORK_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DSH_FORK_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DSH_FORK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          missing=()
+          present=0
+          for name in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -n "${!name:-}" ]]; then present=$((present + 1)); else missing+=("DSH_FORK_${name}"); fi
+          done
+          if ((present == 0)); then
+            echo "No DSH_FORK_* signing secrets configured; falling back to ephemeral debug signing."
+            exit 0
+          fi
+          if ((present < 4)); then
+            echo "Incomplete fork signing secrets; missing: ${missing[*]}" >&2
+            exit 1
+          fi
+          keystore="$RUNNER_TEMP/fork-test.jks"
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n' | base64 -d > "$keystore"
+          python3 - "$keystore" <<'PY'
+          import os, sys
+
+          def esc(value: str) -> str:
+              out = (
+                  value.replace('\\', '\\\\')
+                  .replace('=', '\\=')
+                  .replace(':', '\\:')
+                  .replace('#', '\\#')
+                  .replace('!', '\\!')
+              )
+              if out.startswith((' ', '\t')):
+                  out = '\\' + out
+              return out
+
+          with open('app/android/key.properties', 'w', encoding='utf-8') as f:
+              f.write(f"storeFile={esc(sys.argv[1])}\n")
+              f.write(f"storePassword={esc(os.environ['STORE_PASSWORD'])}\n")
+              f.write(f"keyAlias={esc(os.environ['KEY_ALIAS'])}\n")
+              f.write(f"keyPassword={esc(os.environ['KEY_PASSWORD'])}\n")
+          PY
+          echo "Configured stable fork signing keystore."
       - name: Build isolated arm64 APK
         run: tooling/build-apk.sh --side --no-companion --keep-daemon
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f app/android/key.properties "$RUNNER_TEMP/fork-test.jks"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dsh-go-direct-root-arm64

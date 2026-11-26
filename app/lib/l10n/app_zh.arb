@@ -984,7 +984,7 @@
   "androidShellEntryHint": "独立的系统命令通道，默认关闭",
   "androidShellSubtitle": "通过 Shizuku、自连 ADB 或直连 Root 执行本机 Android 系统命令，不是 Ubuntu 内的 bash。",
   "androidShellEnable": "允许 Android Shell",
-  "androidShellRestoreOnOpen": "打开 Go 时重连",
+  "androidShellRestoreOnOpen": "打开 DSH Go 时重连",
   "androidShellRestoreOnOpenHint": "先手动连通一次。下次冷启动只尝试一次；停止或更换通道会关闭此项。不会记住命令授权。",
   "androidShellEnableHint": "独立开关，不随不打扰模式或屏幕免确认开启；只增加 Android 命令通道，不影响 Ubuntu 里的 bash / run_code 等工具，两者可同时使用。",
   "androidShellConfirmationNote": "每条命令均需确认，可能修改系统和文件。",

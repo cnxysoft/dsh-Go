@@ -1721,11 +1721,11 @@ class L10nEn extends L10n {
   String get androidShellEnable => 'Allow Android Shell';
 
   @override
-  String get androidShellRestoreOnOpen => 'Reconnect when Go opens';
+  String get androidShellRestoreOnOpen => 'Reconnect when DSH Go opens';
 
   @override
   String get androidShellRestoreOnOpenHint =>
-      'Connect manually first. Go tries once on the next cold start. Stopping or switching the connection turns this off. Command approvals are never saved.';
+      'Connect manually first. DSH Go tries once on the next cold start. Stopping or switching the connection turns this off. Command approvals are never saved.';
 
   @override
   String get androidShellEnableHint =>

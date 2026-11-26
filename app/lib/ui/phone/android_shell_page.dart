@@ -190,6 +190,9 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final phone = ref.watch(phoneProvider);
+    ref.listen(phoneProvider, (_, _) {
+      if (!_busy && !_stopping) unawaited(_refresh());
+    });
     final canSetup = !_loading && _status.supported && !_busy && !_stopping;
     final canEnable = canSetup && phone.loaded && phone.status.ready && phone.status.enabled;
     final reasonCode = _status.reasonCode;
@@ -325,14 +328,6 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
           margin: _margin,
           children: [
             ListPageRow(
-              key: const ValueKey('android-shell-stop'),
-              icon: AppIcons.stop,
-              title: l10n.androidShellStop,
-              titleMaxLines: 2,
-              danger: true,
-              onTap: _loading || _stopping ? null : () => unawaited(_stop()),
-            ),
-            ListPageRow(
               title: l10n.androidShellRestoreOnOpen,
               subtitle: l10n.androidShellRestoreOnOpenHint,
               subtitleMaxLines: 4,
@@ -343,6 +338,19 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
                     ? (value) => unawaited(_run(() => _channel.setRestoreOnOpen(value)))
                     : null,
               ),
+            ),
+          ],
+        ),
+        ListPageCard(
+          margin: _margin,
+          children: [
+            ListPageRow(
+              key: const ValueKey('android-shell-stop'),
+              icon: AppIcons.stop,
+              title: l10n.androidShellStop,
+              titleMaxLines: 2,
+              danger: true,
+              onTap: _loading || _stopping ? null : () => unawaited(_stop()),
             ),
           ],
         ),

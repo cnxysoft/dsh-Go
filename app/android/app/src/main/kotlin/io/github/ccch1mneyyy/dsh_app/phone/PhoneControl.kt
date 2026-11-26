@@ -397,7 +397,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             // l10n:keep agent stop reason
             sessions.stopAll("手机操控已关闭")
             retireSkills()
-            stopBridge(stopTransport = false)
+            stopBridge(stopTransport = false, disconnectShell = true)
         } else {
             tasks.clearStop()
             ticker.execute(::keep)
@@ -460,7 +460,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         logger = log
         tasks.invalidateOwners()
         retireSkills()
-        stopBridge()
+        stopBridge(disconnectShell = safe)
         sessions.beginCallerLaunch()
         this.rootfs = rootfs
         if (safe) {
@@ -536,12 +536,12 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         skillDrafts.onEngineRetired() // Retire client grants held by the existing replay skeleton.
     }
 
-    private fun stopBridge(stopTransport: Boolean = true) {
+    private fun stopBridge(stopTransport: Boolean = true, disconnectShell: Boolean = false) {
         localPromptReceipts.clear()
         // The local Flutter channel survives a native launch reset, unlike the
         // old socket. Retire its captured approvals before resetting admission.
         synchronized(companionRunLock) { companionRunEpoch++ }
-        shell.cancelAll()
+        if (disconnectShell) shell.cancelAll() else shell.cancelActive()
         skillReplaySelections.retire()
         selfCheck.stop()
         background.sealTask()

@@ -66,6 +66,9 @@ void main() {
   testWidgets('reconnect requires a live connection and stores no command approval', (tester) async {
     final fake = await _pump(tester, native: ShellNative(status: shellStatus(enabled: true)));
     const key = ValueKey('android-shell-restore-on-open');
+    final reconnectCard = find.ancestor(of: find.byKey(key), matching: find.byType(ListPageCard)).first;
+    final stopCard = find.ancestor(of: find.byKey(const ValueKey('android-shell-stop')), matching: find.byType(ListPageCard)).first;
+    expect(tester.widget(reconnectCard), isNot(same(tester.widget(stopCard))));
     expect(tester.widget<Switch>(find.byKey(key)).onChanged, isNull);
     fake.status = shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null);
     await tester.tap(find.text(appL10n.androidShellRefresh));
