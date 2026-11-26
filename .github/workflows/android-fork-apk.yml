@@ -2,7 +2,7 @@ name: Android fork APK
 
 on:
   push:
-    branches: [codex/android-direct-root]
+    branches: [codex/android-direct-root, codex/android-dc-session-compat]
   workflow_dispatch:
 
 permissions:
