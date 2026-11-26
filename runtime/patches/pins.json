@@ -1,5 +1,29 @@
 {
   "patches": {
+    "android-request-preview.diff": {
+      "0.2.2-rc.1": {
+        "node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js": {
+          "after": "ca9e55f18d72cf0561da0a7220286a52e63d7cf3e660cff9e9241d578f48cd29",
+          "before": "3c17ef1ee80f8e1c9dc9229df4dd680e63387af750a4d26c3d9d056841e2911d"
+        },
+        "node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js": {
+          "after": "048cfbcac530951c038d071ff21a9e1b9fe8611606aef8ccbe344c2b9491e309",
+          "before": "4bb17cac3768f19be0f9ea303cfdfb0ce78424003a12ab5a3179ee41b4aa0feb"
+        },
+        "node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js": {
+          "after": "2bcd47623eac9a43c422e4686d58d71f30ff54d20e47670513a5211db6b5ae6b",
+          "before": "e344108b2a9061faffb23bbcd5c342525f8f98e91fb1806cc1258224a58b53c4"
+        }
+      }
+    },
+    "android-session-team-mode.diff": {
+      "0.2.2-rc.1": {
+        "node_modules/@deepseek-ai/dsh-session/lib/index.js": {
+          "after": "1c6a052ab931daeec900928fbc9653662cf6268409ba91632c919f58f22ded86",
+          "before": "39c4181a4c132f42c7d639d2fdeac9a7794e92a127c789f87eb7c0f7f7db5925"
+        }
+      }
+    },
     "attachment-direct-boundary.diff": {
       "0.2.2-rc.1": {
         "node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js": {
@@ -3198,7 +3222,9 @@
       "ohos-skill-root-events.diff",
       "ohos-piai-empty-models.diff",
       "projection-current-state.diff",
-      "brotli-packed-dictionary.diff"
+      "brotli-packed-dictionary.diff",
+      "android-session-team-mode.diff",
+      "android-request-preview.diff"
     ],
     "ohos": [
       "cordis-effect-dispose-completion.diff",

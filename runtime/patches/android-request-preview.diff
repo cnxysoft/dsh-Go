@@ -1,0 +1,57 @@
+# DeepCode P1 request previews on Android. The transform version is part of the persisted variant key.
+--- a/node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js
+@@ -775,5 +775,5 @@
+ /** Deterministic cached image versions for model requests. */
+ /** Transform version included in every cache and upload-index identity. */
+-const REQUEST_IMAGE_TRANSFORM_VERSION = "request-image-v6";
++const REQUEST_IMAGE_TRANSFORM_VERSION = "request-image-android-p1";
+ function digest(value) {
+ 	return createHash("sha256").update(value).digest("hex");
+@@ -828,10 +828,4 @@
+ }
+ async function createRequestImage(attachment, target, hasAlpha) {
+-	if (target.width >= attachment.ref.width && target.height >= attachment.ref.height && attachment.data.byteLength <= target.maxBytes) return {
+-		data: attachment.data,
+-		mediaType: attachment.ref.mediaType,
+-		width: attachment.ref.width,
+-		height: attachment.ref.height
+-	};
+ 	const encodedVersion = await encodeFirstWithinLimit(encodingLadder(pipeline(attachment, target), hasAlpha), target.maxBytes);
+ 	return isExhaustedEncoding(encodedVersion) ? encodedVersion.smallest : encodedVersion;
+--- a/node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js
+@@ -219,5 +219,5 @@
+ * to every request image so the image count never changes a projection.
+ */
+-const REQUEST_IMAGE_MAX_DIMENSION = 4096;
++const REQUEST_IMAGE_MAX_DIMENSION = 1600;
+ /**
+ * Resolve the encoded-byte target one DeepSeek model route applies to every request image.
+@@ -243,6 +243,6 @@
+ 	const projected = budget === void 0 ? deepSeekRequestImageDimensions(source.width, source.height) : requestImageDimensions(source.width, source.height, budget);
+ 	return {
+-		...Math.max(projected.width, projected.height) > 4096 ? longEdgeDimensions(source.width, source.height, REQUEST_IMAGE_MAX_DIMENSION) : projected,
+-		maxBytes: resolveRequestImageMaxBytes(model)
++		...Math.max(projected.width, projected.height) > REQUEST_IMAGE_MAX_DIMENSION ? longEdgeDimensions(source.width, source.height, REQUEST_IMAGE_MAX_DIMENSION) : projected,
++		maxBytes: Math.min(resolveRequestImageMaxBytes(model), 1024 * 1024)
+ 	};
+ }
+--- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
+@@ -1396,7 +1396,13 @@
+ */
+ function requestImageTarget(ref, budget) {
++	const projected = requestImageDimensions(ref.width, ref.height, budget.maxPixels);
++	const scale = 1600 / Math.max(ref.width, ref.height);
++	const dimensions = Math.max(projected.width, projected.height) <= 1600 ? projected : {
++		width: Math.max(1, Math.round(ref.width * scale)),
++		height: Math.max(1, Math.round(ref.height * scale))
++	};
+ 	return {
+-		...requestImageDimensions(ref.width, ref.height, budget.maxPixels),
+-		maxBytes: budget.maxBytes
++		...dimensions,
++		maxBytes: Math.min(budget.maxBytes, 1024 * 1024)
+ 	};
+ }

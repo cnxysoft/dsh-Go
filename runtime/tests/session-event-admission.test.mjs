@@ -115,3 +115,28 @@ for (const compression of ['none', 'zstd']) {
     }
   });
 }
+
+test('Android restores an rc.3 team/mode row without projecting it or changing writer admission', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-team-mode-'));
+  const ctx = new Context();
+  t.after(async () => { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }); });
+  await apply(ctx, { root, compression: 'zstd', listConcurrency: 1 });
+  const source = Session.create('synthetic-team-mode');
+  message(source, 'before');
+  message(source, 'after');
+  const [before, after] = source.snapshotEvents();
+  const mode = { type: 'team/mode', seq: 1, time: before.time, data: { enabled: true } };
+  const writer = await ctx.sessionPersistence.create(source.header);
+  try { await writer.append([before, mode, { ...after, seq: 2 }]); await writer.flush(); }
+  finally { await writer.close(); }
+  const reader = await ctx.sessionPersistence.open(source.id, 'read');
+  try {
+    const { events } = await reader.read();
+    assert.deepEqual(events[1], mode);
+    const session = Session.fromRestore(source.id, events, source.header, 0, 'detached');
+    assert.deepEqual(session.deriveMessages().map(m => m.content[0].text), ['before', 'after']);
+    const nextSeq = session.snapshotEvents().length; // restore adds session/end-seed
+    assert.throws(() => session.append('team/mode', { enabled: false }), TypeError);
+    assert.equal(message(session, 'continued').seq, nextSeq);
+  } finally { await reader.close(); }
+});

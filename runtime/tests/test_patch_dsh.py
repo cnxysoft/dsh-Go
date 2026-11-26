@@ -380,13 +380,17 @@ class PatchDsh(unittest.TestCase):
             for version, by_file in pins["patches"][name].items():
                 self.assertEqual(sorted(by_file), sorted(rel for rel, _ in files), (name, version))
 
-    def test_shipped_android_chain_is_the_ohos_prefix(self):
+    def test_shared_patches_are_the_ohos_prefix(self):
         shipped = os.path.join(HERE, "..", "patches")
         pins = load(os.path.join(shipped, "pins.json"))
         android, _ = rtbuild.select_dsh_patches(pins, shipped, "android")
         ohos, everything = rtbuild.select_dsh_patches(pins, shipped, "ohos")
-        self.assertEqual(ohos[:len(android)], android)
-        self.assertEqual(sorted(ohos), everything)
+        # These two Android compatibility patches must not change the OHOS runtime.
+        android_only = ["android-session-team-mode.diff", "android-request-preview.diff"]
+        self.assertEqual([name for name in android if name not in ohos], android_only)
+        shared = [name for name in android if name not in android_only]
+        self.assertEqual(ohos[:len(shared)], shared)
+        self.assertEqual(sorted(ohos + android_only), everything)
         self.assertEqual(pins["targetSets"]["android"], android)
         self.assertEqual(pins["targetSets"]["ohos"], ohos)
 
