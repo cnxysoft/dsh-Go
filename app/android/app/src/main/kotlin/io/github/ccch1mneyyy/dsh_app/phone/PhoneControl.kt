@@ -394,6 +394,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         }
         if (!enabled) {
             shell.setRestoreOnOpen(false)
+            shell.resetApproval()
             // l10n:keep agent stop reason
             sessions.stopAll("手机操控已关闭")
             retireSkills()
@@ -1149,6 +1150,9 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     override fun androidShell(): PhoneShellExecutor = PhoneShellExecutor { ownerId, command, timeoutMs, live, confirm ->
         shell.execute(ownerId, command, timeoutMs, live, confirm)
     }
+
+    override fun androidShellApprovalMode(): io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode =
+        shell.approvalMode()
 
     override fun zone(): ZoneId = ZoneId.systemDefault()
 

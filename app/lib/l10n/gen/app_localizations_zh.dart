@@ -1865,6 +1865,77 @@ class L10nZh extends L10n {
   String get androidShellRootTimeout => '等待 Root 授权超时。请在 Root 管理器中允许本应用后重新连接。';
 
   @override
+  String get androidShellApprovalTitle => '命令确认方式';
+
+  @override
+  String get androidShellApprovalEvery => '逐条确认';
+
+  @override
+  String get androidShellApprovalEveryHint => '默认模式，每条 Root 命令都需在原生弹窗中确认。';
+
+  @override
+  String get androidShellApprovalTurn => '本轮免确认';
+
+  @override
+  String get androidShellApprovalTurnHint => '每轮对话首条确认时可点「本轮允许」，同轮后续命令不再弹窗。';
+
+  @override
+  String androidShellApprovalTimedMinutes(int minutes) {
+    return '限时 $minutes 分钟免确认';
+  }
+
+  @override
+  String androidShellApprovalTimedRemaining(int minutes) {
+    return '限时免确认 · 约 $minutes 分钟';
+  }
+
+  @override
+  String get androidShellApprovalTempHint => '仅保存在内存中；到期、停止 Android Shell 或重启 DSH Go 后自动恢复逐条确认。';
+
+  @override
+  String get androidShellApprovalUntilRestart => '重启前免确认';
+
+  @override
+  String get androidShellApprovalUntilRestartHint => '本次运行内直接执行，不落盘；停止或重启 DSH Go 后自动恢复逐条确认。';
+
+  @override
+  String get androidShellApprovalAlways => '全局免确认';
+
+  @override
+  String get androidShellApprovalAlwaysHint => '持久生效，所有 Android Shell 命令直接执行不再弹窗；可随时一键切回逐条确认。';
+
+  @override
+  String get androidShellConfirmationTurnNote => '已允许 Root 按轮免确认：每轮首条确认后，同轮后续命令不再弹窗。';
+
+  @override
+  String androidShellConfirmationTemporaryNote(String mode) {
+    return '当前处于$mode，命令将直接执行；到期、停止或重启后自动恢复逐条确认。';
+  }
+
+  @override
+  String get androidShellConfirmationAlwaysNote => '当前已开启全局免确认，所有 Android Shell 命令将直接执行不再弹窗。';
+
+  @override
+  String get androidShellApprovalTempRiskTitle => '开启临时免确认执行？';
+
+  @override
+  String get androidShellApprovalTempRiskBody =>
+      '有效期内，Android Shell（含 Root UID 0）命令将不再弹窗而直接执行，可能修改系统设置和任意文件。到期、手动停止或重启 DSH Go 后会自动恢复逐条确认。';
+
+  @override
+  String get androidShellApprovalTempRiskAction => '开启临时免确认';
+
+  @override
+  String get androidShellApprovalAlwaysRiskTitle => '开启全局免确认执行？';
+
+  @override
+  String get androidShellApprovalAlwaysRiskBody =>
+      '开启后该设置会持久保存，Android Shell（含 Root UID 0）命令将始终直接执行而不再弹窗，适合无人值守长任务。切通道或关闭手机操控会自动复位，你也可随时在本页一键切回逐条确认。';
+
+  @override
+  String get androidShellApprovalAlwaysRiskAction => '开启全局免确认';
+
+  @override
   String get androidBackgroundProtectionTitle => '增强保活';
 
   @override

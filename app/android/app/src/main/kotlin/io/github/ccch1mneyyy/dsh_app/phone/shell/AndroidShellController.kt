@@ -1,6 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.phone.shell
 
 import android.content.Context
+import android.os.SystemClock
 import io.github.ccch1mneyyy.dsh_app.phone.Decision
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneAndroidShell
 import java.io.IOException
@@ -16,6 +17,10 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     private var enabled = preferences.getBoolean("enabled", false)
     private var backend = preferences.getString("backend", "shizuku").takeIf { it in ShellProtocol.backends } ?: "shizuku"
     private var restorePending = preferences.getBoolean("restoreOnOpen", false)
+    private val approval = ShellApprovalState(
+        ShellApprovalMode.parsePersisted(preferences.getString("approvalMode", null)),
+        SystemClock::elapsedRealtime,
+    )
     @Volatile private var restoreError: String? = null
     private var generation = 0L
     private var setupBusy = false
@@ -56,7 +61,29 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             "limits" to mapOf("defaultTimeoutMs" to ShellProtocol.DEFAULT_TIMEOUT_MS,
                 "maxTimeoutMs" to ShellProtocol.MAX_TIMEOUT_MS, "maxOutputBytes" to ShellProtocol.MAX_OUTPUT_BYTES,
                 "maxCommandBytes" to ShellProtocol.MAX_COMMAND_BYTES),
-        )
+        ) + approval.snapshot().statusFields()
+    }
+
+    fun approvalMode(): ShellApprovalMode = approval.currentMode()
+
+    fun setApproval(modeWire: String, durationMs: Long?): Map<String, Any?> {
+        val next = ShellApprovalMode.parse(modeWire) ?: return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        val persisted = synchronized(guard) {
+            if (next != ShellApprovalMode.EVERY && !enabled) return mapOf("ok" to false, "errorCode" to "disabled")
+            val toPersist = approval.update(next, durationMs) ?: return mapOf("ok" to false, "errorCode" to "invalidArguments")
+            preferences.edit().putString("approvalMode", toPersist.wire).commit()
+            toPersist
+        }
+        onChanged()
+        return status() + mapOf("ok" to true, "errorCode" to null, "persistedMode" to persisted.wire)
+    }
+
+    fun resetApproval() {
+        synchronized(guard) {
+            approval.resetToEvery()
+            preferences.edit().remove("approvalMode").commit()
+        }
+        onChanged()
     }
 
     fun configure(enabled: Boolean, backend: String): Map<String, Any?> {
@@ -65,11 +92,12 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             if (this.enabled == enabled && this.backend == backend) false else {
                 restorePending = false
                 restoreError = null
-                // Commit the selected transport and its cleared reconnect preference together.
+                // Commit the selected transport and its cleared reconnect/approval preferences together.
                 this.enabled = enabled; this.backend = backend; ++generation
                 active?.cancelled = true
+                approval.resetToEvery()
                 clearLinksLocked()
-                preferences.edit().remove("restoreOnOpen").putBoolean("enabled", enabled).putString("backend", backend).commit()
+                preferences.edit().remove("restoreOnOpen").remove("approvalMode").putBoolean("enabled", enabled).putString("backend", backend).commit()
                 true
             }
         }
@@ -191,7 +219,8 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             }
             val decision = confirm(lease.backend, link.uid)
             if (!wanted()) return result(lease, ShellProtocol.failure("cancelled"))
-            PhoneAndroidShell.confirmationError(decision, link.uid)?.let { return result(lease, ShellProtocol.failure(it)) }
+            val allowRootRound = approval.currentMode() == ShellApprovalMode.TURN
+            PhoneAndroidShell.confirmationError(decision, link.uid, allowRootRound)?.let { return result(lease, ShellProtocol.failure(it)) }
             var response = link.call(mapOf("op" to "start", "jobId" to lease.id,
                 "command" to command, "timeoutMs" to timeoutMs, "uid" to link.uid)) {
                 wanted() && synchronized(guard) {
@@ -269,6 +298,7 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     fun cancelAll() {
         val lease = synchronized(guard) {
             ++generation
+            approval.clearTemporary()
             clearLinksLocked()
             active?.also { it.cancelled = true }
         }

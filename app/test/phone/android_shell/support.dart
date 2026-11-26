@@ -55,6 +55,17 @@ class ShellNative {
       case 'androidShellRestoreOnOpen':
         status = {...status, 'restoreOnOpen': (call.arguments as Map)['enabled']};
         return {'ok': true};
+      case 'androidShellSetApproval':
+        final args = call.arguments as Map;
+        final mode = args['mode'];
+        final durationMs = args['durationMs'];
+        status = {
+          ...status,
+          'approvalMode': mode,
+          'approvalExpiresInMs': mode == 'temporary' ? durationMs : null,
+          'approvalUntilRestart': mode == 'temporary' && durationMs == null,
+        };
+        return {'ok': true};
       case 'androidShellRequestPermission':
         return true;
       case 'androidShellPair':

@@ -1,5 +1,6 @@
 package io.github.ccch1mneyyy.dsh_app.phone
 
+import io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 import org.junit.Assert.*
@@ -17,6 +18,7 @@ class PhoneAndroidShellTest {
         var backend = "shizuku"
         var uid = 2000
         var policies = PhonePolicies()
+        var approvalMode = ShellApprovalMode.EVERY
         var decision = Decision.ALLOW_ONCE
         var beforeConfirm: () -> Unit = {}
         var onConfirm: (ConfirmRequest) -> Unit = {}
@@ -39,7 +41,7 @@ class PhoneAndroidShellTest {
             beforeConfirm()
             val decision = confirm(backend, uid)
             afterConfirm()
-            val error = PhoneAndroidShell.confirmationError(decision, uid)
+            val error = PhoneAndroidShell.confirmationError(decision, uid, allowRootRound = approvalMode == ShellApprovalMode.TURN)
             if (!stillWanted()) PhoneAndroidShell.failure("cancelled")
             else if (error != null) PhoneAndroidShell.failure(error)
             else { dispatches++; result }
@@ -49,6 +51,7 @@ class PhoneAndroidShellTest {
             override fun policies() = this@Fixture.policies
             override fun isLocked() = locked
             override fun androidShell() = executor.takeIf { backendAvailable }
+            override fun androidShellApprovalMode() = approvalMode
             override fun gate() = if (!gateAvailable) null else object : UserGate {
                 override fun confirm(request: ConfirmRequest): Decision {
                     asks += request
@@ -219,6 +222,27 @@ class PhoneAndroidShellTest {
             assertEquals(4, f.asks.size)
             assertTrue(f.asks.drop(1).none { it.allowRound })
             assertEquals(3, f.dispatches)
+        }
+    }
+
+    @Test fun rootTurnTemporaryAndAlwaysModesFollowExplicitShellPolicy() {
+        Fixture().use { f ->
+            f.backend = "root"; f.uid = 0; f.approvalMode = ShellApprovalMode.TURN; f.decision = Decision.ALLOW_APP_FOR_TASK
+            assertFalse(f.call().isError)
+            assertEquals(1, f.asks.size)
+            assertTrue(f.asks.single().allowRound)
+            assertFalse(f.call().isError) // Same turn skips prompt.
+            assertEquals(1, f.asks.size)
+            assertEquals(2, f.dispatches)
+            f.tasks.endTask(); f.tasks.begin()
+            assertFalse(f.call().isError) // Next turn asks again.
+            assertEquals(2, f.asks.size)
+        }
+        for (mode in listOf(ShellApprovalMode.TEMPORARY, ShellApprovalMode.ALWAYS)) Fixture().use { f ->
+            f.backend = "root"; f.uid = 0; f.approvalMode = mode; f.decision = Decision.DENY
+            assertFalse(f.call().isError)
+            assertTrue(f.asks.isEmpty())
+            assertEquals(1, f.dispatches)
         }
     }
 

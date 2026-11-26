@@ -95,6 +95,33 @@ void main() {
     expect(fake.callsOf('configureAndroidShell'), isEmpty);
   });
 
+  testWidgets('approval mode supports timed, until-restart, and always behind risk notice with instant revert', (tester) async {
+    final fake = await _pump(
+      tester,
+      native: ShellNative(status: shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null)),
+    );
+    await _tap(tester, 'android-shell-approval');
+    await _tap(tester, 'android-shell-approval-temp-10m');
+    expect(find.text(appL10n.androidShellApprovalTempRiskTitle), findsOneWidget);
+    expect(fake.callsOf('androidShellSetApproval'), isEmpty);
+    await _tap(tester, 'risk-confirm');
+    expect(fake.callsOf('androidShellSetApproval').single.arguments, {'mode': 'temporary', 'durationMs': 600000});
+    expect(find.text(appL10n.androidShellApprovalTimedRemaining(10)), findsOneWidget);
+
+    await _tap(tester, 'android-shell-approval');
+    await _tap(tester, 'android-shell-approval-always');
+    expect(find.text(appL10n.androidShellApprovalAlwaysRiskTitle), findsOneWidget);
+    await _tap(tester, 'risk-confirm');
+    expect(fake.callsOf('androidShellSetApproval').last.arguments, {'mode': 'always'});
+    expect(find.text(appL10n.androidShellConfirmationAlwaysNote), findsOneWidget);
+
+    await _tap(tester, 'android-shell-approval');
+    await _tap(tester, 'android-shell-approval-every');
+    expect(find.byType(RiskNoticeSheet), findsNothing);
+    expect(fake.callsOf('androidShellSetApproval').last.arguments, {'mode': 'every'});
+    expect(find.text(appL10n.androidShellConfirmationNote), findsOneWidget);
+  });
+
   testWidgets('default page keeps technical details collapsed on a phone screen', (tester) async {
     final native = await _pump(
       tester,

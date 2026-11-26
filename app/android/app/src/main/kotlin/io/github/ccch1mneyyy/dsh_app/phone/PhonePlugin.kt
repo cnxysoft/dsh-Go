@@ -242,6 +242,24 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                     else -> async(result, shortControl = true) { control.shell.setRestoreOnOpen(value) }
                 }
             }
+            "androidShellSetApproval" -> {
+                val args = call.arguments as? Map<*, *>
+                val mode = args?.get("mode") as? String
+                val rawDuration = args?.get("durationMs")
+                val durationMs = when (rawDuration) {
+                    null -> null
+                    is Int -> rawDuration.toLong()
+                    is Long -> rawDuration
+                    else -> -1L
+                }
+                when {
+                    args == null || args.keys.any { it !in setOf("mode", "durationMs") } || mode == null || durationMs == -1L ->
+                        result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
+                    mode != "every" && !control.isEnabled() -> result.success(mapOf("ok" to false, "errorCode" to "disabled"))
+                    mode != "every" && control.isLocked() -> result.success(mapOf("ok" to false, "errorCode" to "locked"))
+                    else -> async(result, shortControl = true) { control.shell.setApproval(mode, durationMs) }
+                }
+            }
             "androidShellRequestPermission" -> async(result) { control.shell.requestShizukuPermission() }
             "androidShellStartPairing" -> async(result) { control.shell.startAdbPairing() }
             "androidShellPair" -> {

@@ -20,6 +20,20 @@ enum AndroidShellBackend {
   };
 }
 
+enum AndroidShellApprovalMode {
+  every,
+  turn,
+  temporary,
+  always;
+
+  static AndroidShellApprovalMode parse(Object? value) => switch (value) {
+    'turn' => turn,
+    'temporary' => temporary,
+    'always' => always,
+    _ => every,
+  };
+}
+
 class AndroidShellShizukuStatus {
   const AndroidShellShizukuStatus({this.installed = false, this.running = false, this.granted = false});
 
@@ -54,6 +68,9 @@ class AndroidShellStatus {
     this.ready = false,
     this.uid,
     this.reasonCode,
+    this.approvalMode = AndroidShellApprovalMode.every,
+    this.approvalExpiresInMs,
+    this.approvalUntilRestart = false,
     this.shizuku = const AndroidShellShizukuStatus(),
     this.adb = const AndroidShellAdbStatus(),
     this.limits = const {},
@@ -74,6 +91,11 @@ class AndroidShellStatus {
       return const AndroidShellStatus.unavailable('invalidResponse');
     }
     final limits = _map(value['limits']);
+    final approvalMode = AndroidShellApprovalMode.parse(value['approvalMode']);
+    final approvalUntilRestart = approvalMode == AndroidShellApprovalMode.temporary && value['approvalUntilRestart'] == true;
+    final approvalExpiresInMs = approvalMode == AndroidShellApprovalMode.temporary && !approvalUntilRestart
+        ? _nonNegativeInt(value['approvalExpiresInMs'])
+        : null;
     return AndroidShellStatus(
       supported: true,
       restoreOnOpen: value['restoreOnOpen'] == true,
@@ -82,6 +104,9 @@ class AndroidShellStatus {
       ready: value['ready'] == true,
       uid: uid,
       reasonCode: _code(value['reasonCode']),
+      approvalMode: approvalMode,
+      approvalExpiresInMs: approvalExpiresInMs,
+      approvalUntilRestart: approvalUntilRestart,
       shizuku: AndroidShellShizukuStatus.fromMap(_map(value['shizuku'])),
       adb: AndroidShellAdbStatus.fromMap(_map(value['adb'])),
       limits: Map.unmodifiable({
@@ -98,6 +123,9 @@ class AndroidShellStatus {
   final bool ready;
   final int? uid;
   final String? reasonCode;
+  final AndroidShellApprovalMode approvalMode;
+  final int? approvalExpiresInMs;
+  final bool approvalUntilRestart;
   final AndroidShellShizukuStatus shizuku;
   final AndroidShellAdbStatus adb;
   final Map<String, int> limits;
@@ -154,6 +182,16 @@ class AndroidShellChannel {
 
   Future<AndroidShellResult> setRestoreOnOpen(bool enabled) =>
       _result('androidShellRestoreOnOpen', {'enabled': enabled});
+
+  Future<AndroidShellResult> setApproval(AndroidShellApprovalMode mode, {int? durationMs}) {
+    if (mode != AndroidShellApprovalMode.temporary && durationMs != null) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    if (durationMs != null && (durationMs < 60000 || durationMs > 86400000)) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    return _result('androidShellSetApproval', {'mode': mode.name, 'durationMs': ?durationMs});
+  }
 
   Future<bool> requestPermission() => _bool('androidShellRequestPermission');
 

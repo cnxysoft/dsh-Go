@@ -3542,6 +3542,132 @@ abstract class L10n {
   /// **'等待 Root 授权超时。请在 Root 管理器中允许本应用后重新连接。'**
   String get androidShellRootTimeout;
 
+  /// No description provided for @androidShellApprovalTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'命令确认方式'**
+  String get androidShellApprovalTitle;
+
+  /// No description provided for @androidShellApprovalEvery.
+  ///
+  /// In zh, this message translates to:
+  /// **'逐条确认'**
+  String get androidShellApprovalEvery;
+
+  /// No description provided for @androidShellApprovalEveryHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认模式，每条 Root 命令都需在原生弹窗中确认。'**
+  String get androidShellApprovalEveryHint;
+
+  /// No description provided for @androidShellApprovalTurn.
+  ///
+  /// In zh, this message translates to:
+  /// **'本轮免确认'**
+  String get androidShellApprovalTurn;
+
+  /// No description provided for @androidShellApprovalTurnHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'每轮对话首条确认时可点「本轮允许」，同轮后续命令不再弹窗。'**
+  String get androidShellApprovalTurnHint;
+
+  /// No description provided for @androidShellApprovalTimedMinutes.
+  ///
+  /// In zh, this message translates to:
+  /// **'限时 {minutes} 分钟免确认'**
+  String androidShellApprovalTimedMinutes(int minutes);
+
+  /// No description provided for @androidShellApprovalTimedRemaining.
+  ///
+  /// In zh, this message translates to:
+  /// **'限时免确认 · 约 {minutes} 分钟'**
+  String androidShellApprovalTimedRemaining(int minutes);
+
+  /// No description provided for @androidShellApprovalTempHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅保存在内存中；到期、停止 Android Shell 或重启 DSH Go 后自动恢复逐条确认。'**
+  String get androidShellApprovalTempHint;
+
+  /// No description provided for @androidShellApprovalUntilRestart.
+  ///
+  /// In zh, this message translates to:
+  /// **'重启前免确认'**
+  String get androidShellApprovalUntilRestart;
+
+  /// No description provided for @androidShellApprovalUntilRestartHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'本次运行内直接执行，不落盘；停止或重启 DSH Go 后自动恢复逐条确认。'**
+  String get androidShellApprovalUntilRestartHint;
+
+  /// No description provided for @androidShellApprovalAlways.
+  ///
+  /// In zh, this message translates to:
+  /// **'全局免确认'**
+  String get androidShellApprovalAlways;
+
+  /// No description provided for @androidShellApprovalAlwaysHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'持久生效，所有 Android Shell 命令直接执行不再弹窗；可随时一键切回逐条确认。'**
+  String get androidShellApprovalAlwaysHint;
+
+  /// No description provided for @androidShellConfirmationTurnNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'已允许 Root 按轮免确认：每轮首条确认后，同轮后续命令不再弹窗。'**
+  String get androidShellConfirmationTurnNote;
+
+  /// No description provided for @androidShellConfirmationTemporaryNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前处于{mode}，命令将直接执行；到期、停止或重启后自动恢复逐条确认。'**
+  String androidShellConfirmationTemporaryNote(String mode);
+
+  /// No description provided for @androidShellConfirmationAlwaysNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前已开启全局免确认，所有 Android Shell 命令将直接执行不再弹窗。'**
+  String get androidShellConfirmationAlwaysNote;
+
+  /// No description provided for @androidShellApprovalTempRiskTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启临时免确认执行？'**
+  String get androidShellApprovalTempRiskTitle;
+
+  /// No description provided for @androidShellApprovalTempRiskBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'有效期内，Android Shell（含 Root UID 0）命令将不再弹窗而直接执行，可能修改系统设置和任意文件。到期、手动停止或重启 DSH Go 后会自动恢复逐条确认。'**
+  String get androidShellApprovalTempRiskBody;
+
+  /// No description provided for @androidShellApprovalTempRiskAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启临时免确认'**
+  String get androidShellApprovalTempRiskAction;
+
+  /// No description provided for @androidShellApprovalAlwaysRiskTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启全局免确认执行？'**
+  String get androidShellApprovalAlwaysRiskTitle;
+
+  /// No description provided for @androidShellApprovalAlwaysRiskBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后该设置会持久保存，Android Shell（含 Root UID 0）命令将始终直接执行而不再弹窗，适合无人值守长任务。切通道或关闭手机操控会自动复位，你也可随时在本页一键切回逐条确认。'**
+  String get androidShellApprovalAlwaysRiskBody;
+
+  /// No description provided for @androidShellApprovalAlwaysRiskAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启全局免确认'**
+  String get androidShellApprovalAlwaysRiskAction;
+
   /// No description provided for @androidBackgroundProtectionTitle.
   ///
   /// In zh, this message translates to:

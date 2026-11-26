@@ -108,7 +108,32 @@ void main() {
       expect((await channel.pair('123456', port: port)).ok, isFalse);
       expect((await channel.connect(port: port)).ok, isFalse);
     }
+    expect((await channel.setApproval(AndroidShellApprovalMode.always, durationMs: 600000)).errorCode, 'invalidArguments');
+    expect((await channel.setApproval(AndroidShellApprovalMode.temporary, durationMs: 1000)).errorCode, 'invalidArguments');
     expect(native.calls, isEmpty);
+  });
+
+  test('approval status fields parse safely and setApproval sends exact contract', () async {
+    final native = ShellNative(
+      status: {
+        ...shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null),
+        'approvalMode': 'temporary',
+        'approvalExpiresInMs': 600000,
+        'approvalUntilRestart': false,
+      },
+    )..install();
+    final status = await channel.status();
+    expect(status.approvalMode, AndroidShellApprovalMode.temporary);
+    expect(status.approvalExpiresInMs, 600000);
+    expect(status.approvalUntilRestart, isFalse);
+    expect((await channel.setApproval(AndroidShellApprovalMode.temporary, durationMs: 600000)).ok, isTrue);
+    expect((await channel.setApproval(AndroidShellApprovalMode.temporary)).ok, isTrue);
+    expect((await channel.setApproval(AndroidShellApprovalMode.always)).ok, isTrue);
+    expect(native.callsOf('androidShellSetApproval').map((c) => c.arguments).toList(), [
+      {'mode': 'temporary', 'durationMs': 600000},
+      {'mode': 'temporary'},
+      {'mode': 'always'},
+    ]);
   });
 
   test('missing native support returns stable unavailability and false booleans', () async {

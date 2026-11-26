@@ -163,6 +163,56 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
     await _run(() => pairing ? _channel.pair(input.code!, port: input.port) : _channel.connect(port: input.port));
   }
 
+  String _approvalSummary(L10n l10n) => switch (_status.approvalMode) {
+    AndroidShellApprovalMode.every => l10n.androidShellApprovalEvery,
+    AndroidShellApprovalMode.turn => l10n.androidShellApprovalTurn,
+    AndroidShellApprovalMode.always => l10n.androidShellApprovalAlways,
+    AndroidShellApprovalMode.temporary => _status.approvalUntilRestart
+        ? l10n.androidShellApprovalUntilRestart
+        : l10n.androidShellApprovalTimedRemaining(
+            (((_status.approvalExpiresInMs ?? 0) + 59999) ~/ 60000).clamp(1, 1440),
+          ),
+  };
+
+  String _confirmationBanner(L10n l10n) => switch (_status.approvalMode) {
+    AndroidShellApprovalMode.every => l10n.androidShellConfirmationNote,
+    AndroidShellApprovalMode.turn => l10n.androidShellConfirmationTurnNote,
+    AndroidShellApprovalMode.temporary => l10n.androidShellConfirmationTemporaryNote(_approvalSummary(l10n)),
+    AndroidShellApprovalMode.always => l10n.androidShellConfirmationAlwaysNote,
+  };
+
+  Future<void> _pickApproval({required bool allowRelax}) async {
+    if (_busy || _stopping) return;
+    final choice = await showAppDialog<_ApprovalChoice>(
+      context: context,
+      builder: (_) => _ApprovalChoiceDialog(
+        current: _status.approvalMode,
+        untilRestart: _status.approvalUntilRestart,
+        allowRelax: allowRelax,
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _run(() async {
+      final operation = _operation;
+      if (choice.mode == AndroidShellApprovalMode.temporary || choice.mode == AndroidShellApprovalMode.always) {
+        final l10n = context.l10n;
+        final isAlways = choice.mode == AndroidShellApprovalMode.always;
+        final accepted = await confirmRisk(
+          context,
+          RiskNotice(
+            id: isAlways ? 'phone.android-shell.approval.always' : 'phone.android-shell.approval.temporary',
+            level: RiskLevel.high,
+            title: isAlways ? l10n.androidShellApprovalAlwaysRiskTitle : l10n.androidShellApprovalTempRiskTitle,
+            body: isAlways ? l10n.androidShellApprovalAlwaysRiskBody : l10n.androidShellApprovalTempRiskBody,
+            action: isAlways ? l10n.androidShellApprovalAlwaysRiskAction : l10n.androidShellApprovalTempRiskAction,
+          ),
+        );
+        if (!accepted || !mounted || operation != _operation) return const AndroidShellResult(true);
+      }
+      return _channel.setApproval(choice.mode, durationMs: choice.durationMs);
+    });
+  }
+
   /// Stop remains available while a pairing/connection request is pending.
   Future<void> _stop() async {
     if (_stopping) return;
@@ -229,7 +279,7 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
     return AppPage.list(
       title: l10n.androidShellTitle,
       children: [
-        PhoneNote(tone: NoteTone.warn, text: l10n.androidShellConfirmationNote),
+        PhoneNote(tone: NoteTone.warn, text: _confirmationBanner(l10n)),
         if (!phone.status.enabled) PhoneNote(text: l10n.androidShellMasterOff),
         ListPageCard(
           margin: _margin,
@@ -339,6 +389,14 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
                     : null,
               ),
             ),
+            ListPageRow(
+              key: const ValueKey('android-shell-approval'),
+              title: l10n.androidShellApprovalTitle,
+              value: _approvalSummary(l10n),
+              onTap: canSetup && (_status.approvalMode != AndroidShellApprovalMode.every || (canEnable && _status.enabled))
+                  ? () => unawaited(_pickApproval(allowRelax: canEnable && _status.enabled))
+                  : null,
+            ),
           ],
         ),
         ListPageCard(
@@ -410,6 +468,109 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
     titleMaxLines: 2,
     value: ready ? context.l10n.phoneReady : context.l10n.phoneNotReadyYet,
   );
+}
+
+class _ApprovalChoice {
+  const _ApprovalChoice(this.mode, {this.durationMs});
+
+  final AndroidShellApprovalMode mode;
+  final int? durationMs;
+}
+
+class _ApprovalChoiceDialog extends StatelessWidget {
+  const _ApprovalChoiceDialog({required this.current, required this.untilRestart, required this.allowRelax});
+
+  final AndroidShellApprovalMode current;
+  final bool untilRestart;
+  final bool allowRelax;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    Widget item({
+      required String key,
+      required String title,
+      required String subtitle,
+      required bool selected,
+      required bool enabled,
+      required _ApprovalChoice choice,
+    }) => ListTile(
+      key: ValueKey(key),
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(selected ? AppIcons.radioOn : AppIcons.radioOff),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      enabled: enabled,
+      onTap: enabled ? () => Navigator.pop(context, choice) : null,
+    );
+    return AlertDialog(
+      title: Text(l10n.androidShellApprovalTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            item(
+              key: 'android-shell-approval-every',
+              title: l10n.androidShellApprovalEvery,
+              subtitle: l10n.androidShellApprovalEveryHint,
+              selected: current == AndroidShellApprovalMode.every,
+              enabled: true,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.every),
+            ),
+            item(
+              key: 'android-shell-approval-turn',
+              title: l10n.androidShellApprovalTurn,
+              subtitle: l10n.androidShellApprovalTurnHint,
+              selected: current == AndroidShellApprovalMode.turn,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.turn),
+            ),
+            item(
+              key: 'android-shell-approval-temp-10m',
+              title: l10n.androidShellApprovalTimedMinutes(10),
+              subtitle: l10n.androidShellApprovalTempHint,
+              selected: false,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.temporary, durationMs: 10 * 60 * 1000),
+            ),
+            item(
+              key: 'android-shell-approval-temp-30m',
+              title: l10n.androidShellApprovalTimedMinutes(30),
+              subtitle: l10n.androidShellApprovalTempHint,
+              selected: false,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.temporary, durationMs: 30 * 60 * 1000),
+            ),
+            item(
+              key: 'android-shell-approval-temp-60m',
+              title: l10n.androidShellApprovalTimedMinutes(60),
+              subtitle: l10n.androidShellApprovalTempHint,
+              selected: false,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.temporary, durationMs: 60 * 60 * 1000),
+            ),
+            item(
+              key: 'android-shell-approval-temp-restart',
+              title: l10n.androidShellApprovalUntilRestart,
+              subtitle: l10n.androidShellApprovalUntilRestartHint,
+              selected: current == AndroidShellApprovalMode.temporary && untilRestart,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.temporary),
+            ),
+            item(
+              key: 'android-shell-approval-always',
+              title: l10n.androidShellApprovalAlways,
+              subtitle: l10n.androidShellApprovalAlwaysHint,
+              selected: current == AndroidShellApprovalMode.always,
+              enabled: allowRelax,
+              choice: const _ApprovalChoice(AndroidShellApprovalMode.always),
+            ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel))],
+    );
+  }
 }
 
 class _AdbInput {

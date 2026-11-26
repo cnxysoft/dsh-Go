@@ -1969,6 +1969,83 @@ class L10nEn extends L10n {
       'Root authorization timed out. Allow this app in your Root manager and reconnect.';
 
   @override
+  String get androidShellApprovalTitle => 'Command confirmation';
+
+  @override
+  String get androidShellApprovalEvery => 'Every command';
+
+  @override
+  String get androidShellApprovalEveryHint => 'Default. Every Root command asks for native confirmation.';
+
+  @override
+  String get androidShellApprovalTurn => 'Once per turn';
+
+  @override
+  String get androidShellApprovalTurnHint =>
+      'Allow once per turn on the first Root prompt; later commands in that turn skip prompts.';
+
+  @override
+  String androidShellApprovalTimedMinutes(int minutes) {
+    return 'Auto-approve for $minutes min';
+  }
+
+  @override
+  String androidShellApprovalTimedRemaining(int minutes) {
+    return 'Timed · ~$minutes min left';
+  }
+
+  @override
+  String get androidShellApprovalTempHint =>
+      'In-memory only. Reverts to every command when time expires, on Stop, or after restarting DSH Go.';
+
+  @override
+  String get androidShellApprovalUntilRestart => 'Until restart';
+
+  @override
+  String get androidShellApprovalUntilRestartHint =>
+      'In-memory only for this run. Reverts to every command on Stop or when DSH Go restarts.';
+
+  @override
+  String get androidShellApprovalAlways => 'Always auto-approve';
+
+  @override
+  String get androidShellApprovalAlwaysHint =>
+      'Persisted across restarts. Commands run without prompting until you switch back or change backend.';
+
+  @override
+  String get androidShellConfirmationTurnNote =>
+      'Per-turn Root confirmation is enabled: approving the first command skips prompts for the rest of that turn.';
+
+  @override
+  String androidShellConfirmationTemporaryNote(String mode) {
+    return '$mode is active: commands run without prompting and revert on expiry, Stop, or restart.';
+  }
+
+  @override
+  String get androidShellConfirmationAlwaysNote =>
+      'Always auto-approve is active: Android Shell commands run without prompting.';
+
+  @override
+  String get androidShellApprovalTempRiskTitle => 'Enable temporary auto-approve?';
+
+  @override
+  String get androidShellApprovalTempRiskBody =>
+      'While active, Android Shell commands (including Root UID 0) run immediately without prompting and may modify system settings or files. It automatically reverts when time expires, on Stop, or after restarting DSH Go.';
+
+  @override
+  String get androidShellApprovalTempRiskAction => 'Enable temporary auto-approve';
+
+  @override
+  String get androidShellApprovalAlwaysRiskTitle => 'Enable persistent auto-approve?';
+
+  @override
+  String get androidShellApprovalAlwaysRiskBody =>
+      'This setting persists across restarts and runs Android Shell commands (including Root UID 0) without prompting for unattended tasks. Switching backends or disabling Phone control resets it, and you can switch back here anytime.';
+
+  @override
+  String get androidShellApprovalAlwaysRiskAction => 'Enable always auto-approve';
+
+  @override
   String get androidBackgroundProtectionTitle => 'Enhanced background protection';
 
   @override
