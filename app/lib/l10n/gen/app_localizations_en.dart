@@ -1721,6 +1721,13 @@ class L10nEn extends L10n {
   String get androidShellEnable => 'Allow Android Shell';
 
   @override
+  String get androidShellRestoreOnOpen => 'Reconnect when Go opens';
+
+  @override
+  String get androidShellRestoreOnOpenHint =>
+      'Connect manually first. Go tries once on the next cold start. Stopping or switching the connection turns this off. Command approvals are never saved.';
+
+  @override
   String get androidShellEnableHint =>
       'A separate switch, independent of non-disruptive mode and screen confirmation. It only adds an Android command channel; Ubuntu tools such as bash and run_code keep working, and both can be used together.';
 
@@ -15242,6 +15249,9 @@ class L10nEn extends L10n {
       'cleanup': 'Resource cleanup is unconfirmed. Reconnect the channel, then check again.',
       'denied': 'The system denied the operation.',
       'timeout': 'The operation timed out; sent work may still complete.',
+      'channel_unavailable': 'The selected background channel is unavailable. Reconnect it and run the check again.',
+      'device_unavailable':
+          'The device could not complete this step. This does not establish a permission or capability failure.',
       'unavailable': 'The local status or selected channel is unavailable.',
       'target_unavailable': 'The fixed target could not be verified. Finish cleanup before starting again.',
       'target_changed': 'The original target changed. Continue only with cleanup.',

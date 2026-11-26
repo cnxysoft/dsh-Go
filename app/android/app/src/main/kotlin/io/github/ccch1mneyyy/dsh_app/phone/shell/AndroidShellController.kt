@@ -15,6 +15,8 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     private val guard = Any()
     private var enabled = preferences.getBoolean("enabled", false)
     private var backend = preferences.getString("backend", "shizuku").takeIf { it in ShellProtocol.backends } ?: "shizuku"
+    private var restorePending = preferences.getBoolean("restoreOnOpen", false)
+    @Volatile private var restoreError: String? = null
     private var generation = 0L
     private var setupBusy = false
     private var pendingRoot: ShellLink? = null
@@ -43,11 +45,12 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             config.second == "shizuku" && shizukuStatus["running"] != true -> "shizukuStopped"
             config.second == "shizuku" && shizukuStatus["granted"] != true -> "permissionRequired"
             config.second == "adb" && adbStatus["paired"] != true -> "adbNotPaired"
+            restoreError != null -> restoreError
             config.second == "root" -> "rootNotConnected"
             else -> "notConnected"
         }
         return mapOf(
-            "v" to 1, "enabled" to config.first, "backend" to config.second,
+            "v" to 1, "restoreOnOpen" to preferences.getBoolean("restoreOnOpen", false), "enabled" to config.first, "backend" to config.second,
             "ready" to (config.first && link != null), "uid" to link?.uid,
             "reasonCode" to reason, "shizuku" to shizukuStatus, "adb" to adbStatus,
             "limits" to mapOf("defaultTimeoutMs" to ShellProtocol.DEFAULT_TIMEOUT_MS,
@@ -60,10 +63,13 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         if (backend !in ShellProtocol.backends) return mapOf("ok" to false, "errorCode" to "invalidArguments")
         val changed = synchronized(guard) {
             if (this.enabled == enabled && this.backend == backend) false else {
+                restorePending = false
+                restoreError = null
+                // Commit the selected transport and its cleared reconnect preference together.
                 this.enabled = enabled; this.backend = backend; ++generation
                 active?.cancelled = true
                 clearLinksLocked()
-                preferences.edit().putBoolean("enabled", enabled).putString("backend", backend).apply()
+                preferences.edit().remove("restoreOnOpen").putBoolean("enabled", enabled).putString("backend", backend).apply()
                 true
             }
         }
@@ -84,8 +90,22 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     }
 
     /** Explicit setup only. status/configure never start a privileged process. */
-    fun connect(port: Int? = null): Map<String, Any?> {
+    // Opt in only for the already verified transport. Never persist a command grant.
+    fun setRestoreOnOpen(value: Boolean): Map<String, Any?> = synchronized(guard) {
+        if (value && (!enabled || readyLink?.alive() != true)) return mapOf("ok" to false, "errorCode" to "notConnected")
+        preferences.edit().putBoolean("restoreOnOpen", value).apply()
+        restoreError = null
+        restorePending = false
+        mapOf("ok" to true)
+    }
+
+    fun restoreOnOpen() { connect(restoring = true) }
+
+    fun connect(port: Int? = null, restoring: Boolean = false): Map<String, Any?> {
         val selection = synchronized(guard) {
+            if (restoring && !restorePending) return mapOf("ok" to true)
+            restorePending = false
+            restoreError = null
             if (!enabled) return mapOf("ok" to false, "errorCode" to "disabled")
             if (setupBusy || active != null) return mapOf("ok" to false, "errorCode" to "busy")
             setupBusy = true; generation to backend
@@ -96,7 +116,10 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
                 if (port != null) return mapOf("ok" to false, "errorCode" to "invalidArguments")
                 connectRoot(wanted)
             } else connection(selection.second, port, wanted)
-            val link = connection.link ?: return mapOf("ok" to false, "errorCode" to connection.errorCode)
+            val link = connection.link ?: run {
+                synchronized(guard) { if (restoring && wanted()) restoreError = connection.errorCode }
+                return mapOf("ok" to false, "errorCode" to connection.errorCode)
+            }
             synchronized(guard) {
                 if (!wanted()) { link.close(); return mapOf("ok" to false, "errorCode" to "cancelled") }
                 readyLink = link

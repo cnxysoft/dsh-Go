@@ -85,6 +85,17 @@ class PhoneCallerTest {
         assertEquals(0, calls)
     }
 
+    @Test fun promptCorrelationIsOptionalPerCallAndNeverReadFromArguments() {
+        val server = McpServer(emptyList(), { _, _, _ -> ToolOutput("ok") })
+        val id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        fun dispatch(meta: Map<String, Any?>) = (server.dispatch(request(1, meta, args = mapOf("promptRequestId" to id))) as McpServer.Dispatch.Call).caller!!
+        assertEquals(id, dispatch(caller("A") + ("promptRequestId" to id)).promptRequestId)
+        for (invalid in listOf(null, 42, "not-a-uuid", id + "\n")) {
+            assertNull(dispatch(caller("A") + ("promptRequestId" to invalid)).promptRequestId)
+        }
+        assertNull(dispatch(caller("A")).promptRequestId)
+    }
+
     @Test fun onlyExactLifecycleIntegerEnablesModernAttribution() {
         val server = McpServer(emptyList(), { _, _, _ -> ToolOutput("ok") })
         val absent = server.dispatch(request(1, caller("A"))) as McpServer.Dispatch.Call

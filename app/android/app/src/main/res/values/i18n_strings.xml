@@ -8,6 +8,7 @@
     <string name="self_update_wait_title">End this installation wait?</string>
     <string name="self_update_wait_confirm">The previous request may still be running in the system installer. Clearing this local record does not cancel it. First check that no installation is in progress. Nothing is installed or retried by clearing this record.</string>
     <string name="self_update_wait_end">Clear waiting record</string>
+    <string name="phone_shell_prompt_match">Request ID matches a message sent from this phone’s chat composer.</string>
     <string name="phone_shell_confirm">Run an Android system command (%1$s, UID %2$s). It may change system settings or app data. Screen-control confirmation exemptions do not apply. Allow only this command:\n\n%3$s</string>
     <!-- background -->
     <string name="background_shizuku_missing">No available Shizuku / Sui interface detected</string>

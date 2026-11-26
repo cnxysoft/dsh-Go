@@ -48,6 +48,7 @@ class AndroidShellAdbStatus {
 class AndroidShellStatus {
   const AndroidShellStatus({
     this.supported = false,
+    this.restoreOnOpen = false,
     this.enabled = false,
     this.backend = AndroidShellBackend.shizuku,
     this.ready = false,
@@ -75,6 +76,7 @@ class AndroidShellStatus {
     final limits = _map(value['limits']);
     return AndroidShellStatus(
       supported: true,
+      restoreOnOpen: value['restoreOnOpen'] == true,
       enabled: value['enabled'] == true,
       backend: backend,
       ready: value['ready'] == true,
@@ -90,6 +92,7 @@ class AndroidShellStatus {
   }
 
   final bool supported;
+  final bool restoreOnOpen;
   final bool enabled;
   final AndroidShellBackend backend;
   final bool ready;
@@ -120,6 +123,20 @@ class AndroidShellChannel {
 
   static const _channel = MethodChannel('dsh/phone');
 
+  Future<bool> recordLocalComposerPrompt(String sessionId, String requestId) async {
+    try {
+      return await _channel.invokeMethod<bool>('recordLocalComposerPrompt', {
+            'sessionId': sessionId,
+            'requestId': requestId,
+          }) ==
+          true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   Future<AndroidShellStatus> status() async {
     try {
       final value = await _channel.invokeMethod<Object?>('androidShellStatus');
@@ -134,6 +151,9 @@ class AndroidShellChannel {
 
   Future<AndroidShellResult> configure({required bool enabled, required AndroidShellBackend backend}) =>
       _result('configureAndroidShell', {'enabled': enabled, 'backend': backend.name});
+
+  Future<AndroidShellResult> setRestoreOnOpen(bool enabled) =>
+      _result('androidShellRestoreOnOpen', {'enabled': enabled});
 
   Future<bool> requestPermission() => _bool('androidShellRequestPermission');
 

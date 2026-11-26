@@ -51,7 +51,7 @@ object PhoneAndroidShell {
 
     fun run(request: Request, owner: PhoneTasks.Owner, tasks: PhoneTasks, scope: SerialWorker.Scope,
             executor: PhoneShellExecutor?, enabled: () -> Boolean, locked: () -> Boolean,
-            gate: () -> UserGate?, ui: PhoneUiText): Map<String, Any?> {
+            gate: () -> UserGate?, ui: PhoneUiText, localPromptMatched: Boolean = false): Map<String, Any?> {
         fun live() = tasks.isCurrent(owner) && !tasks.isPaused && enabled() && !locked() &&
             !Thread.currentThread().isInterrupted
         // 通道未开启 / 锁屏 / 本轮已结束 refuse this one command; they never end the turn.
@@ -64,8 +64,9 @@ object PhoneAndroidShell {
             else if (!ShellProtocol.validUid(backend, uid)) Decision.DENY
             else if (uid != 0 && tasks.hasGrant(null, GRANT)) Decision.ALLOW_ONCE
             else {
+                val sourceNote = if (localPromptMatched) ui.get("phone_shell_prompt_match", "请求编号与本机输入框的发送记录一致。") + "\n" else "" // l10n:keep test default
                 val prompt = ConfirmRequest(
-                    ui.get("phone_shell_confirm",
+                    sourceNote + ui.get("phone_shell_confirm",
                         "执行 Android 系统命令（%1\$s，UID %2\$s）。这可能修改系统或应用数据；屏幕操作的免确认不适用：\n\n%3\$s",
                         backend, uid.toString(), request.command), // l10n:keep test default
                     appLabel = null, packageName = null, firstInApp = false, allowRound = uid != 0, owner = owner,

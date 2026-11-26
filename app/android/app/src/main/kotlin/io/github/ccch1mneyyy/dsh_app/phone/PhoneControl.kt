@@ -81,6 +81,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             "phone_log_type" -> return@PhoneUiText AppStrings.plural(app, R.plurals.phone_log_type, args[2] as Int, *args.toTypedArray())
         }
         val id = when (key) {
+            "phone_shell_prompt_match" -> R.string.phone_shell_prompt_match
             "phone_shell_confirm" -> R.string.phone_shell_confirm
             "phone_waived_status" -> R.string.phone_waived_status
             "phone_move_background" -> R.string.phone_move_background
@@ -205,13 +206,18 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         })
     private val server = McpServer(PhoneToolCatalog.listJson(), { name, args, _ -> sessions.run(sessions.admit(null), name, args) }, SERVER_VERSION,
         diagnostics = { args, caller -> RuntimeController.get(app).diagnosticsTool.call(args, caller) })
+    internal val localPromptReceipts = LocalPromptReceipts()
     private val bridge = PhoneBridge(server, { line -> logger(line) }, { call ->
         if (call.name == DiagnosticsTool.NAME) PhoneCallWork({ call.run() })
         else if (call.name == PhoneCore.REPLAY) replayWork(call) else {
         val admission = sessions.admit(call.caller)
         val nativeReplyCommit = PhoneReplyCommit()
         PhoneCallWork(
-            invoke = { call.runWithCommit(nativeReplyCommit) { name, args, _ -> sessions.run(admission, name, args) } },
+            invoke = { call.runWithCommit(nativeReplyCommit) { name, args, caller ->
+                val matched = name == PhoneToolCatalog.ANDROID_SHELL && caller?.promptRequestId != null &&
+                    localPromptReceipts.matches(caller.sessionId, caller.promptRequestId, caller.runId)
+                sessions.run(admission, name, args, localPromptMatched = matched)
+            } },
             remainingMs = { sessions.remainingMs(admission) },
             expiredReply = { call.run { _, _, _ -> sessions.expire(admission) } },
             nativeReplyCommit = nativeReplyCommit,
@@ -219,6 +225,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         }
     }, { end ->
         try {
+            localPromptReceipts.end(end.sessionId, end.runId)
             val task = sessions.admitEnd(end.sessionId, end.runId, end.completion)
             PhoneBridge.EndWork(end.ack()) {
                 if (task != null) { background.sealTask(task.tasks.snapshot().id); sessions.settleEnd(task) }
@@ -386,6 +393,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             prefs.edit().putBoolean(K_ENABLED, enabled).apply()
         }
         if (!enabled) {
+            shell.setRestoreOnOpen(false)
             // l10n:keep agent stop reason
             sessions.stopAll("手机操控已关闭")
             retireSkills()
@@ -529,6 +537,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     }
 
     private fun stopBridge(stopTransport: Boolean = true) {
+        localPromptReceipts.clear()
         // The local Flutter channel survives a native launch reset, unlike the
         // old socket. Retire its captured approvals before resetting admission.
         synchronized(companionRunLock) { companionRunEpoch++ }

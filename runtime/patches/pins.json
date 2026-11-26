@@ -1,5 +1,29 @@
 {
   "patches": {
+    "android-phone-prompt-correlation.diff": {
+      "0.2.2-rc.1": {
+        "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js": {
+          "after": "760a5c6a20ea94749e4b69b3283d26e8d87f5b92a8d71ca066c8f5c2cea223ed",
+          "before": "3f24d26d55bfd18bb091b6b1c5bd7a702261d06f25d6ce67d3d5ea67b2df753d"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/pipeline.js": {
+          "after": "7d67ced5b0b1bfc47dd46e35cc90f68a2c7465eaaa4830da270ce81536755086",
+          "before": "ffc614ba600aaf9f3c2a4497dff441c8e8c228c22212741b9de43a0958b0b907"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/types/batch.js": {
+          "after": "8a727fa453f2070f7882506d27f29d3984ea220118d5197b8013b6bc9f0b9370",
+          "before": "dc556cd5a3cbd9cdc48b1e9d161baefc29ca5990609d590171c90e2792058fd7"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/types/contracts.d.ts": {
+          "after": "9e52aa2c8c3436827efb56c6d1488b3a1ffc5599228483741fb8c88e4b1e58cf",
+          "before": "1ffde725339118581cb60ae10e67fdc423a51ff14a545661e6a56124418ec5f8"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/types/executor.d.ts": {
+          "after": "a868a4697fb084c44adb4f949bdddc09749b6b611061224208b6a35d010aa08a",
+          "before": "15edf7305a43b62a6fba29d2df3cc1a06f17edd4477216b0bcad13c80b094980"
+        }
+      }
+    },
     "android-request-preview.diff": {
       "0.2.2-rc.1": {
         "node_modules/@deepseek-ai/dsh-attachment-local/lib/index.js": {
@@ -3224,7 +3248,8 @@
       "projection-current-state.diff",
       "brotli-packed-dictionary.diff",
       "android-session-team-mode.diff",
-      "android-request-preview.diff"
+      "android-request-preview.diff",
+      "android-phone-prompt-correlation.diff"
     ],
     "ohos": [
       "cordis-effect-dispose-completion.diff",

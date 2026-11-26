@@ -63,7 +63,9 @@ String phoneSelfCheckReasonGroup(String? reason) => switch (reason) {
   'mainSamplesUnchanged' => 'main_unchanged',
   'mainSamplesIncomplete' => 'main_incomplete',
   'notInstalled' => 'not_installed',
-  'unavailable' || 'channelUnavailable' || 'deviceUnavailable' => 'unavailable',
+  'channelUnavailable' => 'channel_unavailable',
+  'deviceUnavailable' => 'device_unavailable',
+  'unavailable' => 'unavailable',
   _ => 'other',
 };
 
@@ -290,10 +292,10 @@ String phoneSelfCheckMarkdown(PhoneSelfCheckSnapshot snapshot) {
   out.writeln('This is the latest accepted status snapshot, not proof of the current device state.\n');
   out.writeln('State: ${snapshot.state}');
   out.writeln('Reason: ${phoneSelfCheckReasonGroup(snapshot.reason)}\n');
-  out.writeln('| Stage | State | Observed | Reason | Duration (ms) |');
-  out.writeln('| --- | --- | --- | --- | --- |');
+  out.writeln('| Stage | State | Observed | Reason | Duration (ms) | Native reason |');
+  out.writeln('| --- | --- | --- | --- | --- | --- |');
   for (final step in snapshot.steps) {
-    out.writeln('| ${step.stage} | ${step.state} | ${step.observed} | ${phoneSelfCheckReasonGroup(step.reason)} | ${step.durationMs ?? "unknown"} |');
+    out.writeln('| ${step.stage} | ${step.state} | ${step.observed} | ${phoneSelfCheckReasonGroup(step.reason)} | ${step.durationMs ?? "unknown"} | ${step.reason ?? 'none'} |');
   }
   final text = out.toString();
   if (utf8.encode(text).length > diagnosticsMarkdownBytes) throw StateError('selfCheckReportBudget');

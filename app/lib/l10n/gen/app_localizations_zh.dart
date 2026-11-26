@@ -1640,6 +1640,12 @@ class L10nZh extends L10n {
   String get androidShellEnable => '允许 Android Shell';
 
   @override
+  String get androidShellRestoreOnOpen => '打开 Go 时重连';
+
+  @override
+  String get androidShellRestoreOnOpenHint => '先手动连通一次。下次冷启动只尝试一次；停止或更换通道会关闭此项。不会记住命令授权。';
+
+  @override
   String get androidShellEnableHint =>
       '独立开关，不随不打扰模式或屏幕免确认开启；只增加 Android 命令通道，不影响 Ubuntu 里的 bash / run_code 等工具，两者可同时使用。';
 
@@ -14438,6 +14444,8 @@ class L10nZh extends L10n {
       'cleanup': '资源清理未确认，请重新连接通道后再检查。',
       'denied': '系统拒绝了操作。',
       'timeout': '操作超时，已派发工作仍可能完成。',
+      'channel_unavailable': '已选后台通道不可用。请重新连接此通道，再运行自检。',
+      'device_unavailable': '设备端未能完成这一步，尚不能确定是权限还是系统能力问题。',
       'unavailable': '本机状态或已选通道不可用。',
       'target_unavailable': '无法核实固定目标，请完成清理后再开始。',
       'target_changed': '原目标已变化，请仅继续清理。',

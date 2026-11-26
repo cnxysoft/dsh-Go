@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../diagnostics/app_error_log.dart';
 import '../l10n/l10n.dart';
+import '../phone/android_shell_channel.dart';
 import '../usage/usage_stats.dart';
+import 'android_features.dart';
 import 'attachments.dart';
 import 'chat_error_text.dart';
 import 'connection_state.dart';
@@ -1301,6 +1303,45 @@ class ChatController extends Notifier<ChatState> {
     if (echoed.isEmpty) return;
     final rest = _pending.where((p) => !echoed.contains(p.requestId)).toList();
     if (rest.length != _pending.length) _pending = List.unmodifiable(rest);
+  }
+
+  /// Only the ordinary composer calls this. A shared [send] also serves remote,
+  /// companion, queue restoration and automated inputs; those are not receipts.
+  Future<bool> sendFromComposer(
+    String text, {
+    List<DraftAttachment> attachments = const [],
+    required SendMode mode,
+  }) async {
+    final connection = ref.read(activeConnectionProvider).value;
+    if (ref.read(operatingSystemProvider) != 'android' ||
+        connection == null ||
+        !connection.isLocal ||
+        !identical(connection.client, _client)) {
+      return send(text, attachments: attachments, mode: mode);
+    }
+    final generation = connection.client.mux.generation;
+    String? submitted;
+    final accepted = await send(
+      text,
+      attachments: attachments,
+      mode: mode,
+      beforeDeliver: (id) async {
+        submitted = id;
+        return true;
+      },
+    );
+    final id = submitted;
+    if (accepted &&
+        id != null &&
+        ref.mounted &&
+        _canControl &&
+        identical(connection.client, _client) &&
+        identical(ref.read(activeConnectionProvider).value, connection) &&
+        identical(connection.client.mux.generation, generation)) {
+      // Best effort and after host acceptance: never delay a send or certify an uncertain result.
+      unawaited(const AndroidShellChannel().recordLocalComposerPrompt(sessionId, id));
+    }
+    return accepted;
   }
 
   /// Sends [text] with [attachments]; resolves to `false` when it could not be

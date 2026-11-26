@@ -796,7 +796,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
             current.openApproval == null) {
       ok = await chat.answer(request, [QuestionAnswer(request.questions.single.id, custom: text)]);
     } else {
-      ok = await chat.send(text, attachments: drafts, mode: mode);
+      ok = await chat.sendFromComposer(text, attachments: drafts, mode: mode);
       // A generation request, counted on top of its turn.
       if (ok && generate != null && mounted) ref.read(usageStatsProvider.notifier).count(UsageCount.gen);
     }

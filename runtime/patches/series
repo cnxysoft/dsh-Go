@@ -233,6 +233,7 @@ brotli-packed-dictionary.diff
 # Android-only compatibility with DeepCode histories and request images.
 android-session-team-mode.diff
 android-request-preview.diff
+android-phone-prompt-correlation.diff
 # HarmonyOS-only overlays (pins.json targetSets.ohos), after the whole common chain.
 ohos-attachment-publication.diff
 ohos-attachment-diagnostic.diff

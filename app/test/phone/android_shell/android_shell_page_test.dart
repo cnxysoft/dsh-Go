@@ -63,6 +63,35 @@ Switch _switch(WidgetTester tester) => tester.widget(find.byKey(const ValueKey('
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('reconnect requires a live connection and stores no command approval', (tester) async {
+    final fake = await _pump(tester, native: ShellNative(status: shellStatus(enabled: true)));
+    const key = ValueKey('android-shell-restore-on-open');
+    expect(tester.widget<Switch>(find.byKey(key)).onChanged, isNull);
+    fake.status = shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null);
+    await tester.tap(find.text(appL10n.androidShellRefresh));
+    await tester.pumpAndSettle();
+    await _tap(tester, key.value);
+    expect(tester.widget<Switch>(find.byKey(key)).value, isTrue);
+    expect(fake.callsOf('androidShellRestoreOnOpen').single.arguments, {'enabled': true});
+    expect(fake.callsOf('androidShellConnect'), isEmpty);
+  });
+
+  testWidgets('a failed reconnect can be turned off without retrying or enabling phone control', (tester) async {
+    final fake = ShellNative(status: {
+      ...shellStatus(enabled: true, backend: 'root', reasonCode: 'rootTimeout'),
+      'restoreOnOpen': true,
+    });
+    await _pump(tester, native: fake, phoneEnabled: false);
+    expect(find.text(appL10n.androidShellRootTimeout), findsOneWidget);
+    const key = ValueKey('android-shell-restore-on-open');
+    await _tap(tester, key.value);
+    expect(fake.callsOf('androidShellRestoreOnOpen').single.arguments, {'enabled': false});
+    expect(tester.widget<Switch>(find.byKey(key)).value, isFalse);
+    expect(tester.widget<Switch>(find.byKey(key)).onChanged, isNull);
+    expect(fake.callsOf('androidShellConnect'), isEmpty);
+    expect(fake.callsOf('configureAndroidShell'), isEmpty);
+  });
+
   testWidgets('default page keeps technical details collapsed on a phone screen', (tester) async {
     final native = await _pump(
       tester,

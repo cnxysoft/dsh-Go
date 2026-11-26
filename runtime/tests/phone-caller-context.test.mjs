@@ -80,6 +80,17 @@ test('shared MCP client keeps two Agents and each turn separate, arguments canno
   assert.notEqual(next.caller.runId, one.caller.runId);
 });
 
+test('tool-supplied local origin is not promoted to managed caller metadata', async t => {
+  const f = await fixture(t), a = await f.create();
+  const claims = { origin: 'local', requestId: 'synthetic-local-prompt' };
+  const args = { _meta: { 'dsh-go/phone-caller': { v: 1, sessionId: a.session.id, ...claims } } };
+  const managed = await f.run(a, 1, args);
+  assert.deepEqual(managed.args, args); // Still untrusted tool input, not host metadata.
+  assert.equal(managed.caller.sessionId, a.session.id);
+  for (const field of Object.keys(claims)) assert.ok(!Object.hasOwn(managed.caller, field));
+  assert.equal((await f.run(a, 1, args, false)).caller, null);
+});
+
 test('a delayed call keeps its admitted turn while a later turn completes', async t => {
   const f = await fixture(t), a = await f.create();
   const entered = Promise.withResolvers(), release = Promise.withResolvers();

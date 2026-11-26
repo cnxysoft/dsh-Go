@@ -466,7 +466,7 @@ void main() {
 
   test('failed native copy still deletes only its own temp operation', () async {
     final root = await Directory.systemTemp.createTemp('self-check-test-');
-    final sibling = await File('${root.path}/keep.txt').writeAsString('unrelated');
+    final sibling = await File.fromUri(root.uri.resolve('keep.txt')).writeAsString('unrelated');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(_files, (_) async {
       throw PlatformException(code: 'copyFailed', message: 'private');
     });
@@ -498,7 +498,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     final context = tester.element(find.byType(PhoneSelfCheckPanel));
-    expect(find.text(context.l10n.phoneSelfCheckReason('unavailable')), findsOneWidget);
+    expect(find.text(context.l10n.phoneSelfCheckReason('channel_unavailable')), findsOneWidget);
     expect(find.byKey(const ValueKey('self-check-reason-channel')), findsNothing);
     expect(find.text('channelUnavailable'), findsNothing);
     await tester.pumpWidget(const SizedBox());
@@ -830,6 +830,7 @@ void main() {
     expect(text, contains('MAIN never passes'));
     expect(text, contains('| main | unknown | true | main_unchanged |'));
     expect(text, contains('| ocr | not_run | false | not_installed |'));
+    expect(text, contains('| notInstalled |'));
     expect(text, isNot(contains('private-')));
     expect(text, isNot(contains('acquisitionCount')));
     expect(utf8.encode(text).length, lessThanOrEqualTo(diagnosticsMarkdownBytes));

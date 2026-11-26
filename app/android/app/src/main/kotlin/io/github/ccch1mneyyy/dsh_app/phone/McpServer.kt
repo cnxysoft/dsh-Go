@@ -13,9 +13,13 @@ class ToolOutput(
 }
 
 /** Host attribution, separate from tool arguments. It is not an approval or a task lease. */
-data class PhoneCaller(val sessionId: String, val runId: String, val callId: String, val runLifecycle: Int = 0) {
+data class PhoneCaller(val sessionId: String, val runId: String, val callId: String, val runLifecycle: Int = 0,
+                       val promptRequestId: String? = null) {
     companion object {
         const val META_KEY = "dsh-go/phone-caller"
+        private val promptUuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+
+        fun promptId(value: Any?): String? = (value as? String)?.takeIf { it.length == 36 && promptUuid.matches(it) }
 
         fun identifier(value: Any?): String? = (value as? String)?.takeIf {
             it.length in 1..256 && it.none { c -> c < ' ' || c == '\u007f' }
@@ -26,7 +30,9 @@ data class PhoneCaller(val sessionId: String, val runId: String, val callId: Str
             if (m["v"] != 1L) return null
             val lifecycle = if (m.containsKey("runLifecycle")) m["runLifecycle"] else 0L
             if (lifecycle != 0L && lifecycle != 1L) return null
-            return PhoneCaller(identifier(m["sessionId"]) ?: return null, identifier(m["runId"]) ?: return null, identifier(m["callId"]) ?: return null, (lifecycle as Long).toInt())
+            // A remote client can also supply a UUID. Correlation is not consent.
+            val prompt = promptId(m["promptRequestId"])
+            return PhoneCaller(identifier(m["sessionId"]) ?: return null, identifier(m["runId"]) ?: return null, identifier(m["callId"]) ?: return null, (lifecycle as Long).toInt(), prompt)
         }
     }
 }

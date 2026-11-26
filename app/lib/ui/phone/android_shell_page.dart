@@ -332,6 +332,18 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
               danger: true,
               onTap: _loading || _stopping ? null : () => unawaited(_stop()),
             ),
+            ListPageRow(
+              title: l10n.androidShellRestoreOnOpen,
+              subtitle: l10n.androidShellRestoreOnOpenHint,
+              subtitleMaxLines: 4,
+              trailing: Switch(
+                key: const ValueKey('android-shell-restore-on-open'),
+                value: _status.restoreOnOpen,
+                onChanged: canSetup && (_status.restoreOnOpen || (canEnable && _status.ready))
+                    ? (value) => unawaited(_run(() => _channel.setRestoreOnOpen(value)))
+                    : null,
+              ),
+            ),
           ],
         ),
         PhoneOptionsFold(

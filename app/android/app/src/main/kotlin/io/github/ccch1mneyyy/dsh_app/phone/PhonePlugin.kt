@@ -40,12 +40,20 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
     private val previewOwner = Any()
     private var previewTaskId: Long? = null
     private var previewSink: EventChannel.EventSink? = null
+    @Volatile private var hostResumed = false
     private val previewLifecycle = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityPaused(host: Activity) {
-            if (activity?.activity === host) control.preview.removeConsumer(previewOwner)
+            if (activity?.activity === host) {
+                hostResumed = false
+                control.preview.removeConsumer(previewOwner)
+            }
         }
         override fun onActivityResumed(host: Activity) {
-            if (activity?.activity === host) attachPreviewConsumer()
+            if (activity?.activity === host) {
+                hostResumed = true
+                attachPreviewConsumer()
+                io.execute { if (attached && hostResumed && control.isEnabled() && !control.isLocked()) control.shell.restoreOnOpen() }
+            }
         }
         override fun onActivityCreated(host: Activity, state: Bundle?) {}
         override fun onActivityStarted(host: Activity) {}
@@ -145,6 +153,7 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) = onAttachedToActivity(binding)
 
     override fun onDetachedFromActivity() {
+        hostResumed = false
         control.preview.removeConsumer(previewOwner)
         activity?.removeOnNewIntentListener(this)
         control.prompts.attachActivity(promptOwner, null)
@@ -201,6 +210,16 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
             "companionScreenSample" -> async(result) { companionScreen.sample(call.arguments as? Map<*, *>) }
             "status" -> control.status { complete(result, it) }
             "setCompanionSessions" -> result.success(control.setCompanionSessions((call.arguments as? Map<*, *>)?.get("ids")))
+            "recordLocalComposerPrompt" -> {
+                val args = call.arguments as? Map<*, *>
+                val session = PhoneCaller.identifier(args?.get("sessionId"))
+                val prompt = PhoneCaller.promptId(args?.get("requestId"))
+                if (session != null && prompt != null && hostResumed && control.isEnabled() &&
+                    !control.isLocked() && control.bridgeListening) {
+                    control.localPromptReceipts.remember(session, prompt)
+                    result.success(true)
+                } else result.success(false)
+            }
             "androidShellStatus" -> async(result, shortControl = true) { control.shell.status() }
             "configureAndroidShell" -> {
                 val args = call.arguments as? Map<*, *>
@@ -211,6 +230,15 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                 } else if (enabled && !control.isEnabled()) {
                     result.success(mapOf("ok" to false, "errorCode" to "disabled"))
                 } else async(result, shortControl = true) { control.shell.configure(enabled, backend!!) }
+            }
+            "androidShellRestoreOnOpen" -> {
+                val value = (call.arguments as? Map<*, *>)?.get("enabled") as? Boolean
+                result.success(when {
+                    value == null -> mapOf("ok" to false, "errorCode" to "invalidArguments")
+                    value && !control.isEnabled() -> mapOf("ok" to false, "errorCode" to "disabled")
+                    value && control.isLocked() -> mapOf("ok" to false, "errorCode" to "locked")
+                    else -> control.shell.setRestoreOnOpen(value)
+                })
             }
             "androidShellRequestPermission" -> async(result) { control.shell.requestShizukuPermission() }
             "androidShellStartPairing" -> async(result) { control.shell.startAdbPairing() }
@@ -235,7 +263,11 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                     }
                 }
             }
-            "androidShellStop" -> { control.shell.cancelAll(); result.success(true) }
+            "androidShellStop" -> async(result, shortControl = true) {
+                control.shell.setRestoreOnOpen(false)
+                control.shell.cancelAll()
+                true
+            }
             "acknowledgeTaskInterruption" -> async(result) {
                 (call.argument<Any?>("batchToken") as? String)?.let(control::acknowledgeTaskInterruption) == true
             }

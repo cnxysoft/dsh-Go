@@ -100,6 +100,7 @@ class PhoneCore(
         internal val replayOutcomes: PhoneSkillOutcomes? = null,
         internal val replayDriver: PhoneDriver? = null,
         private val replayApp: PhoneAppIdentity? = null,
+        val localPromptMatched: Boolean = false,
     ) {
         // Only Sessions reads/writes acquisition under its registry lock; never a Core-wide grant.
         internal var borrowedMainForBackgroundOpen = false
@@ -228,8 +229,8 @@ class PhoneCore(
     }
 
     /** Sessions owns begin/callStarted; initial PM preparation runs before resource admission. */
-    internal fun prepareCall(name: String, args: Map<String, Any?>, owner: PhoneTasks.Owner): Either<ToolOutput, PreparedCall> {
-        val result = try { prepare(name, Args(args.toMap()), owner) }
+    internal fun prepareCall(name: String, args: Map<String, Any?>, owner: PhoneTasks.Owner, localPromptMatched: Boolean = false): Either<ToolOutput, PreparedCall> {
+        val result = try { prepare(name, Args(args.toMap()), owner, localPromptMatched = localPromptMatched) }
         catch (_: InterruptedException) { Thread.currentThread().interrupt(); Either.Left(stoppedOut(name)) }
         catch (e: Exception) { Either.Left(failedOut(name, e)) }
         return when (result) {
@@ -367,7 +368,7 @@ class PhoneCore(
             val refreshMain = name == PhoneToolCatalog.INTENT ||
                 (name == PhoneToolCatalog.OPEN && a.bool("background") != true)
             val call = if (prepared != null && !refreshMain) prepared else when (
-                val result = prepare(name, a, owner, prepared?.requestedApp)
+                val result = prepare(name, a, owner, prepared?.requestedApp, prepared?.localPromptMatched == true)
             ) {
                 is Either.Left -> return result.value
                 is Either.Right -> result.value
@@ -375,7 +376,7 @@ class PhoneCore(
             if (!current(owner)) return stoppedOut(name)
             if (call.replay != null) return replay(call, scope, owner)
             return when (name) {
-                PhoneToolCatalog.ANDROID_SHELL -> androidShell(a, scope, owner)
+                PhoneToolCatalog.ANDROID_SHELL -> androidShell(a, scope, owner, call.localPromptMatched)
                 PhoneToolCatalog.APPS -> apps(a, owner)
                 PhoneToolCatalog.OPEN -> open(call, scope, owner)
                 PhoneToolCatalog.INTENT -> intent(call, scope, owner)
@@ -399,13 +400,13 @@ class PhoneCore(
     private fun current(owner: PhoneTasks.Owner): Boolean =
         tasks.isCurrent(owner) && !Thread.currentThread().isInterrupted
 
-    private fun androidShell(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+    private fun androidShell(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, localPromptMatched: Boolean): Out {
         val request = PhoneAndroidShell.parse(a) ?: return Out(
             Json.write(PhoneAndroidShell.failure("invalidArguments")), error = true)
         // Arbitrary system effects cannot become an implicitly verified UI replay route.
         skillTrace.markIncomplete(owner, PhoneTaskTrace.Gap.UNCERTAIN_RESULT)
         val result = PhoneAndroidShell.run(request, owner, tasks, scope, env.androidShell(),
-            env::enabled, env::isLocked, env::gate, ui)
+            env::enabled, env::isLocked, env::gate, ui, localPromptMatched)
         val successfulExit = when (val code = result["exitCode"]) {
             is Int -> code == 0
             is Long -> code == 0L
@@ -450,7 +451,7 @@ class PhoneCore(
         }
 
     private fun prepare(name: String, a: Args, owner: PhoneTasks.Owner,
-                        selectedApp: AppEntry? = null): Either<Out, PreparedCall> {
+                        selectedApp: AppEntry? = null, localPromptMatched: Boolean = false): Either<Out, PreparedCall> {
         if (!current(owner)) return Either.Left(stoppedOut(name))
         val screens = when (val route = requiredScreens(name, a)) {
             is Either.Left -> return Either.Left(Out(route.value, error = true))
@@ -521,7 +522,7 @@ class PhoneCore(
             }
         }
         if (!current(owner)) return Either.Left(stoppedOut(name))
-        return Either.Right(PreparedCall(name, a, owner, screens, launch, requestedApp))
+        return Either.Right(PreparedCall(name, a, owner, screens, launch, requestedApp, localPromptMatched = localPromptMatched))
     }
 
     private fun open(call: PreparedCall, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {

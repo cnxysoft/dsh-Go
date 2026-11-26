@@ -7,6 +7,7 @@ import 'package:dsh_app/state/android_features.dart';
 import 'package:dsh_app/state/chat_state.dart';
 import 'package:dsh_app/state/connection_state.dart';
 import 'package:dsh_client/dsh_client.dart';
+import 'package:flutter/services.dart' show MethodCall, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -165,6 +166,65 @@ void main() {
   tearDown(() async {
     container.dispose();
     await client.events.close();
+  });
+
+  test('only accepted local Android composer sends report an ID, never content', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('dsh/phone');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    container.updateOverrides([
+      operatingSystemProvider.overrideWithValue('android'),
+      activeConnectionProvider.overrideWithValue(AsyncData(HostConnection(client: client, isLocal: true))),
+    ]);
+    client.events.add(
+      SessionSnapshotEvent.fromJson('s1', {
+        'header': {'id': 's1'},
+        'cursor': -1,
+        'records': <Object?>[],
+        'projections': {'asOfSeq': -1, 'values': <String, Object?>{}},
+      }),
+    );
+    await container.pump();
+    await chat().send('automatic input');
+    expect(calls, isEmpty);
+    expect(await chat().sendFromComposer('local input', mode: SendMode.queue), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls.map((call) => call.method), ['recordLocalComposerPrompt']);
+    expect(calls.single.arguments, {'sessionId': 's1', 'requestId': client.prompts.last.requestId});
+    client.promptError = const DshRemoteException('denied', 'fixture');
+    expect(await chat().sendFromComposer('rejected input', mode: SendMode.queue), isFalse);
+    expect(calls, hasLength(1));
+    client.promptError = null;
+    final held = client.promptResult = Completer<String>();
+    final pending = chat().sendFromComposer('host changes before acceptance', mode: SendMode.queue);
+    await settle();
+    expect(client.calls.last, contains('host changes before acceptance'));
+    container.updateOverrides([
+      operatingSystemProvider.overrideWithValue('android'),
+      activeConnectionProvider.overrideWithValue(AsyncData(HostConnection(client: client, isLocal: false))),
+    ]);
+    client.events.add(
+      SessionSnapshotEvent.fromJson('s1', {
+        'header': {'id': 's1'},
+        'cursor': -1,
+        'records': <Object?>[],
+        'projections': {'asOfSeq': -1, 'values': <String, Object?>{}},
+      }),
+    );
+    await container.pump();
+    held.complete('accepted');
+    await pending;
+    expect(calls, hasLength(1));
+    client.promptResult = null;
+    expect(await chat().sendFromComposer('remote input', mode: SendMode.queue), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, hasLength(1));
   });
 
   Future<void> inTestClock(WidgetTester tester) async {

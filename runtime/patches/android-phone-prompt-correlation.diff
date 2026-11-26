@@ -1,0 +1,84 @@
+--- a/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js
+@@ -834,6 +834,7 @@
+ 		}
+ 		phase.turn = turn;
+ 		let turnEnds = null;
++		let phonePromptId; // Correlation only, never proof of local origin.
+ 		let target = "next-turn";
+ 		try {
+ 			while (true) {
+@@ -864,7 +865,11 @@
+ 						if (session === this.session) toolRecovery.observe(event);
+ 					});
+ 					try {
+-						const stepEnd = await this.step(decision);
++						if (decision.messages.length) {
++							const source = step === 1 && decision.messages.length === 1 ? decision.messages[0].source : undefined;
++							phonePromptId = source?.kind === "user" && typeof source.rpcId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(source.rpcId) && source.rpcId.length === 36 ? source.rpcId : undefined;
++						}
++						const stepEnd = await this.step(decision, phonePromptId);
+ 						if (turnEnds === null || turnEnds.kind !== "max-tokens") turnEnds = stepEnd;
+ 					} catch (error) {
+ 						try {
+@@ -942,7 +947,7 @@
+ 		phase.step = 0;
+ 		return true;
+ 	}
+-	async step(decision) {
++	async step(decision, phonePromptId) {
+ 		/* v8 ignore next -- private callers establish the running phase before executing a step */
+ 		if (this.phase.kind !== "running") throw new Error(`agent "${this.id}": step outside running phase`);
+ 		const { turn, step, abort: { signal } } = this.phase;
+@@ -1076,6 +1081,7 @@
+ 						calls: toolCalls,
+ 						signal,
+ 						agent: this,
++						...(phonePromptId === undefined ? {} : { phonePromptId }),
+ 						log: {
+ 							turn,
+ 							step
+--- a/node_modules/@deepseek-ai/dsh-tools/lib/types/batch.js
++++ b/node_modules/@deepseek-ai/dsh-tools/lib/types/batch.js
+@@ -47,7 +47,7 @@
+                 });
+             });
+         }
+-        phoneCaller = Object.freeze({ sessionId: agent.session.id, runId: `${epoch}:${input.log.turn}` });
++        phoneCaller = Object.freeze({ sessionId: agent.session.id, runId: `${epoch}:${input.log.turn}`, ...(input.phonePromptId === undefined ? {} : { promptRequestId: input.phonePromptId }) });
+     }
+     if (maxParallelToolCalls !== undefined && (!Number.isInteger(maxParallelToolCalls) || maxParallelToolCalls < 1)) {
+         throw new RangeError('maxParallelToolCalls must be a positive integer');
+--- a/node_modules/@deepseek-ai/dsh-tools/lib/pipeline.js
++++ b/node_modules/@deepseek-ai/dsh-tools/lib/pipeline.js
+@@ -49,7 +49,7 @@
+ 				});
+ 			});
+ 		}
+-		phoneCaller = Object.freeze({ sessionId: agent.session.id, runId: `${epoch}:${input.log.turn}` });
++		phoneCaller = Object.freeze({ sessionId: agent.session.id, runId: `${epoch}:${input.log.turn}`, ...(input.phonePromptId === undefined ? {} : { promptRequestId: input.phonePromptId }) });
+ 	}
+ 	if (maxParallelToolCalls !== void 0 && (!Number.isInteger(maxParallelToolCalls) || maxParallelToolCalls < 1)) throw new RangeError("maxParallelToolCalls must be a positive integer");
+ 	const settlement = new BatchSettlement(input, pipeline.tools.dshGoCompanionResults);
+--- a/node_modules/@deepseek-ai/dsh-tools/lib/types/executor.d.ts
++++ b/node_modules/@deepseek-ai/dsh-tools/lib/types/executor.d.ts
+@@ -14,6 +14,8 @@
+ }
+ /** Raw model calls, with optional Agent ownership and model-step logging. */
+ export interface ToolBatchInput {
++    /** Host correlation only; not a permission or a client identity. */
++    readonly phonePromptId?: string;
+     readonly calls: readonly ToolCallBlock[];
+     readonly signal: AbortSignal;
+     /**
+--- a/node_modules/@deepseek-ai/dsh-tools/lib/types/contracts.d.ts
++++ b/node_modules/@deepseek-ai/dsh-tools/lib/types/contracts.d.ts
+@@ -175,7 +175,7 @@
+     /** The agent on whose behalf the call runs (set by the agent loop). */
+     readonly agent?: Agent;
+     /** Captured by the host batch; PTC inherits it independently of model arguments. */
+-    readonly phoneCaller?: Readonly<{ sessionId: string; runId: string }>;
++    readonly phoneCaller?: Readonly<{ sessionId: string; runId: string; promptRequestId?: string }>;
+     /** Step admission shared by Native and PTC dispatch. Conditional tools require it. */
+     readonly toolSet?: ResolvedToolSet;
+     /**

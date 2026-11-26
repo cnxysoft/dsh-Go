@@ -52,6 +52,9 @@ class ShellNative {
         final args = call.arguments as Map;
         status = {...status, 'enabled': args['enabled'], 'backend': args['backend']};
         return {'ok': true};
+      case 'androidShellRestoreOnOpen':
+        status = {...status, 'restoreOnOpen': (call.arguments as Map)['enabled']};
+        return {'ok': true};
       case 'androidShellRequestPermission':
         return true;
       case 'androidShellPair':

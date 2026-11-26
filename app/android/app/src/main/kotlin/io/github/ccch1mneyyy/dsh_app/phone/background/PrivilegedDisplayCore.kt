@@ -776,7 +776,8 @@ class PrivilegedDisplayCore internal constructor(
                 display = null; reader = null; pendingReader = null
                 releasingDisplayId = null; displayCreationAttempted = false
             }
-            if (e is Fault) throw e else throw Fault("displayUnsupported")
+            // Preserve an actual system refusal for the self-check report.
+            if (e is Fault || e is SecurityException) throw e else throw Fault("displayUnsupported")
         }
     }
 

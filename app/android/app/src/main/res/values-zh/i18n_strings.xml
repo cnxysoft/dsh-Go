@@ -7,6 +7,7 @@
     <string name="self_update_wait_title">结束本次安装等待？</string>
     <string name="self_update_wait_confirm">先前的请求可能仍在系统安装器中执行。清除此本地记录不等于取消安装，请先确认系统没有正在进行的安装。清除记录不会安装、重试或切换安装通道。</string>
     <string name="self_update_wait_end">清除等待记录</string>
+    <string name="phone_shell_prompt_match">请求编号与本机输入框的发送记录一致。</string>
     <string name="phone_shell_confirm">执行 Android 系统命令（%1$s，UID %2$s）。这可能修改系统或应用数据；屏幕操作的免确认不适用。仅允许本条命令：\n\n%3$s</string>
     <!-- background -->
     <string name="background_shizuku_missing">未检测到可用的 Shizuku / Sui 接口</string>

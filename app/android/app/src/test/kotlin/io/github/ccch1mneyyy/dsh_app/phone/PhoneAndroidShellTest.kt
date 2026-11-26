@@ -68,9 +68,9 @@ class PhoneAndroidShellTest {
         val core = PhoneCore(env, tasks, log)
         fun call(command: String = "printf test", extra: Map<String, Any?> = emptyMap()) =
             core.call(PhoneToolCatalog.ANDROID_SHELL, mapOf("command" to command) + extra)
-        fun direct(owner: PhoneTasks.Owner) = PhoneAndroidShell.run(
+        fun direct(owner: PhoneTasks.Owner, matched: Boolean = false) = PhoneAndroidShell.run(
             PhoneAndroidShell.Request("printf test", 100), owner, tasks, SerialWorker.Scope(),
-            env.androidShell(), env::enabled, env::isLocked, env::gate, PhoneUiText.DEFAULT)
+            env.androidShell(), env::enabled, env::isLocked, env::gate, PhoneUiText.DEFAULT, matched)
         override fun close() { core.worker.shutdown() }
     }
 
@@ -127,6 +127,16 @@ class PhoneAndroidShellTest {
             }
             assertEquals(0, f.executorCalls)
             assertTrue(f.asks.isEmpty())
+        }
+    }
+
+    @Test fun aMatchedPromptNeverGrantsRootOnItsOwn() {
+        Fixture().use { f ->
+            f.backend = "root"; f.uid = 0; f.decision = Decision.DENY
+            val owner = (f.tasks.begin() as PhoneTasks.Begin.Go).owner
+            assertEquals("confirmationDenied", f.direct(owner, matched = true)["errorCode"])
+            assertFalse(f.asks.single().allowRound)
+            assertEquals(0, f.dispatches)
         }
     }
 

@@ -235,15 +235,15 @@ class PhoneTaskSessions(
         selections: PhoneSkillReplaySelections, outcomes: PhoneSkillOutcomes): ToolOutput =
         run(admission, PhoneCore.REPLAY, emptyMap(), selection, selections, outcomes)
 
-    fun run(admission: Admission, name: String, args: Map<String, Any?>): ToolOutput =
-        run(admission, name, args, null, null, null)
+    fun run(admission: Admission, name: String, args: Map<String, Any?>, localPromptMatched: Boolean = false): ToolOutput =
+        run(admission, name, args, null, null, null, localPromptMatched)
 
     private fun run(admission: Admission, name: String, args: Map<String, Any?>,
         replay: PhoneSkillReplaySelections.Selection?, selections: PhoneSkillReplaySelections?,
-        outcomes: PhoneSkillOutcomes?): ToolOutput {
+        outcomes: PhoneSkillOutcomes?, localPromptMatched: Boolean = false): ToolOutput {
         synchronized(admission) { admission.runner = Thread.currentThread() }
         try {
-            return runAdmitted(admission, name, args, replay, selections, outcomes)
+            return runAdmitted(admission, name, args, replay, selections, outcomes, localPromptMatched)
         } finally {
             synchronized(admission) {
                 admission.runner = null
@@ -254,7 +254,7 @@ class PhoneTaskSessions(
 
     private fun runAdmitted(admission: Admission, name: String, args: Map<String, Any?>,
         replay: PhoneSkillReplaySelections.Selection?, selections: PhoneSkillReplaySelections?,
-        outcomes: PhoneSkillOutcomes?): ToolOutput {
+        outcomes: PhoneSkillOutcomes?, localPromptMatched: Boolean): ToolOutput {
         val task = admission.task ?: return ToolOutput(checkNotNull(admission.refusal), isError = true)
         var owner: PhoneTasks.Owner? = null
         var prepared: PhoneCore.PreparedCall? = null
@@ -346,7 +346,7 @@ class PhoneTaskSessions(
                 return if (remainingMs(admission) <= 0) deadlineOutput() else stopped()
             }
             if (remainingMs(admission) <= 0) return deadlineOutput()
-            val preparation = if (replay == null) task.core.prepareCall(name, args, owner)
+            val preparation = if (replay == null) task.core.prepareCall(name, args, owner, localPromptMatched)
                 else task.core.prepareReplayCall(replay, checkNotNull(selections), checkNotNull(outcomes), owner)
             val call = when (val result = preparation) {
                 is Either.Left -> return result.value
