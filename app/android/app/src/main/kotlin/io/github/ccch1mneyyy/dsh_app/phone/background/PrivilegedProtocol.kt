@@ -5,6 +5,7 @@ package io.github.ccch1mneyyy.dsh_app.phone.background
 
 import android.os.Bundle
 import android.os.Parcel
+import io.github.ccch1mneyyy.dsh_app.BuildConfig
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -131,10 +132,11 @@ object Proto {
     const val IME_PID = "imePid"
     const val IME_REQUESTED_AT = "imeRequestedAt"
 
-    /** 自动恢复无障碍: grants [APP_PACKAGE] WRITE_SECURE_SETTINGS in [USER]; nothing else is grantable. */
+    /** 自动恢复无障碍: grants WRITE_SECURE_SETTINGS only to this APK variant in [USER]. */
     const val OP_GRANT_SECURE_SETTINGS = "grantSecureSettings"
     const val USER = "user"
-    const val APP_PACKAGE = "io.github.ccch1mneyyy.dsh_app"
+    // Privileged helpers may have a system Context. Keep target identity fixed to the APK variant.
+    const val APP_PACKAGE = BuildConfig.APPLICATION_ID
 
     const val INJECT_OK = "injectOk"
     /** Gate only, with INJECT_OK false: the failing injection's [ERROR] code. Older cores omit it. */

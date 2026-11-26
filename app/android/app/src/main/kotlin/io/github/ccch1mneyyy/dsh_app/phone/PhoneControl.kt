@@ -1083,7 +1083,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     override fun shownControls(): TaskControls? =
         displaySelection.controls { task, owner, reason -> stopOwner(task, owner, reason) }
 
-    override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) { shell.cancelAll(); selfCheck.stop(); sessions.stopAll(reason, source) }
+    override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) { shell.cancelActive(); selfCheck.stop(); sessions.stopAll(reason, source) }
 
     override fun onAccessibilityChanged(connected: Boolean) = emitStatus()
 

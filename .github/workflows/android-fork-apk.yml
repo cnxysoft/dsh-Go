@@ -39,7 +39,7 @@ jobs:
         run: |
           flutter pub get --enforce-lockfile
           printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
-          gradle --project-dir android wrapper --gradle-version 9.3.1
+          gradle --project-dir android wrapper --gradle-version 9.3.1 || (sleep 10 && gradle --project-dir android wrapper --gradle-version 9.3.1)
           python3 tool/l10n_merge.py
           git diff --exit-code -- lib/l10n
           python3 tool/guide_sync.py --check
@@ -122,7 +122,7 @@ jobs:
         run: |
           flutter pub get --enforce-lockfile
           printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
-          gradle --project-dir android wrapper --gradle-version 9.3.1
+          gradle --project-dir android wrapper --gradle-version 9.3.1 || (sleep 10 && gradle --project-dir android wrapper --gradle-version 9.3.1)
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: fork-build-runtime-arm64

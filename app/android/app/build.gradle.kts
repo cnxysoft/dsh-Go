@@ -60,6 +60,7 @@ fun buildMinuteVersionCode(): Int {
 android {
     namespace = "io.github.ccch1mneyyy.dsh_app"
     compileSdk = flutter.compileSdkVersion
+    buildFeatures { buildConfig = true }
     // The device tests under src/androidTest are AndroidTestCase tests; these platform libraries
     // carry that API (no longer in android.jar). Device-test classpath only.
     useLibrary("android.test.base")

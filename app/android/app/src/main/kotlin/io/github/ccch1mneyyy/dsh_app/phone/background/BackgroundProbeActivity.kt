@@ -1,6 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.phone.background
 
 import android.app.Activity
+import android.content.ComponentName
 import android.graphics.Canvas
 import android.graphics.Color
 import android.os.Bundle
@@ -140,8 +141,7 @@ class BackgroundProbeActivity : Activity() {
 
 /** Private Binder messages, never marshalled into the adb/root byte stream. */
 internal object ProbeActivityContract {
-    const val PACKAGE = "io.github.ccch1mneyyy.dsh_app"
-    const val ACTIVITY = "$PACKAGE.phone.background.BackgroundProbeActivity"
+    val component: ComponentName get() = ComponentName(Proto.APP_PACKAGE, BackgroundProbeActivity::class.java.name)
     const val RECEIVER = "receiver"
     const val NONCE = "nonce"
     const val DISPLAY = "display"

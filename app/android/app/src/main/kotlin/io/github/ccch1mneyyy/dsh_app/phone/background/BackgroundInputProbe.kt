@@ -2,7 +2,6 @@ package io.github.ccch1mneyyy.dsh_app.phone.background
 
 import android.app.ActivityOptions
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -78,7 +77,7 @@ internal class BackgroundInputProbe(private val context: Context, private val di
                 throw probe.failure("inputWindowNotReady")
             probe.entered(InputProbeDiagnostics.Stage.ACTIVITY_START)
             val intent = Intent().apply {
-                component = ComponentName(ProbeActivityContract.PACKAGE, ProbeActivityContract.ACTIVITY)
+                component = ProbeActivityContract.component
                 identifier = nonce
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
                 putExtra(ProbeActivityContract.NONCE, nonce)
@@ -87,6 +86,8 @@ internal class BackgroundInputProbe(private val context: Context, private val di
             }
             val options = ActivityOptions.makeBasic().apply { launchDisplayId = display.displayId }
             // Binder endpoints stay in Android's Intent delivery, never in Bundles.marshal's byte stream.
+            // Android consumes the one-shot on send. Do not call cancel(): the root helper
+            // runs under a system Context and cannot cancel as the owner of package "android".
             val pending = PendingIntent.getActivity(context.createDisplayContext(display), display.displayId,
                 intent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
             try {
@@ -94,7 +95,6 @@ internal class BackgroundInputProbe(private val context: Context, private val di
                 pending.send(context, 0, null, null, null, null, options.toBundle())
             } catch (e: PendingIntent.CanceledException) { session.rejected(); probe.fail(e) }
             catch (e: SecurityException) { session.rejected(); probe.fail(e) }
-            finally { pending.cancel() }
             probe.verify(now = SystemClock::uptimeMillis, send = { target, time ->
                 if (session.isSealed || !display.isValid) throw probe.failure("inputWindowNotReady")
                 send(target, time)

@@ -13,6 +13,7 @@ class AndroidShellLifecycleContractTest {
         assertTrue(control.contains("stopBridge(disconnectShell = safe)"))
         assertTrue(control.contains("private fun stopBridge(stopTransport: Boolean = true, disconnectShell: Boolean = false)"))
         assertTrue(control.contains("if (disconnectShell) shell.cancelAll() else shell.cancelActive()"))
+        assertTrue(control.contains("override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) { shell.cancelActive();"))
 
         val controller = File(phone, "shell/AndroidShellController.kt").readText()
         val cancelActiveBody = controller.substringAfter("fun cancelActive()").substringBefore("private fun cancelLease")
