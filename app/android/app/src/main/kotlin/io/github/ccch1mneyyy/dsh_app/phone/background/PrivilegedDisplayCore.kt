@@ -234,9 +234,9 @@ class PrivilegedDisplayCore internal constructor(
             if (op == Proto.OP_REPLAY_NAVIGATION) response.getBundle(Proto.NAVIGATION)?.putString("post", "unknown")
             if (response.containsKey(Proto.COORDINATE_SCOPE_VERSION)) response.putBoolean(Proto.COORDINATE_SCOPE_KNOWN, false)
             val code = failureCode(e)
-            if (code == "deviceUnavailable") {
+            if (code == "deviceUnavailable" || selfCheckReply || targetReply) {
                 runCatching {
-                    android.util.Log.w("DshPrivDisplay", "op=$op failed: ${e.javaClass.name} at ${e.stackTrace.firstOrNull()}")
+                    android.util.Log.w("DshPrivDisplay", "op=$op code=$code err=${e.javaClass.name} at ${e.stackTrace.firstOrNull()}")
                 }
             }
             response.putBoolean(Proto.OK, false)
@@ -656,7 +656,16 @@ class PrivilegedDisplayCore internal constructor(
         if (initial) response?.putBoolean(Proto.INITIAL_COUNTER_MATCHED, tree.complete && evidence.counterMatched)
         else if (tree.complete) response?.putBoolean(Proto.COUNTER_MATCHED, evidence.counterMatched)
         if (!tree.complete) throw Fault("targetUnavailable")
-        if (!matched) throw Fault("targetChanged")
+        if (!matched) {
+            runCatching {
+                android.util.Log.w(
+                    "DshPrivDisplay",
+                    "target read mismatch initial=$initial win=${tree.targetWindowId} targetMatched=${evidence.targetMatched} usable=$usable secrets=${tree.hasSecrets} sensitive=${tree.hasSensitive} elems=${tree.elements.size}",
+                )
+            }
+            // During initial launch read, views may not have completed their first layout pass yet.
+            throw Fault(if (initial && windowId == null && !tree.hasSecrets && !tree.hasSensitive) "targetUnavailable" else "targetChanged")
+        }
         if (!evidence.counterMatched) throw Fault("targetReadbackMismatch")
         return TargetSnapshot(run, checkNotNull(tree.targetWindowId), tree.elements.indexOf(button) + 1, checkNotNull(button))
     }
@@ -717,6 +726,7 @@ class PrivilegedDisplayCore internal constructor(
                 // An attempted send is not proof of delivery or proof that no input occurred.
                 response.putBoolean(Proto.INJECT_OK, false)
                 sendMotion(MotionEvent.ACTION_DOWN, point.x, point.y, time, waitForFinish = false)
+                sleepChecked(30)
                 sendMotion(MotionEvent.ACTION_UP, point.x, point.y, time, waitForFinish = false)
             }
             response.putBoolean(Proto.INJECT_OK, true) // Only matching receiver DOWN/UP gets here.

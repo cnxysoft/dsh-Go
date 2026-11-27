@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -38,6 +39,11 @@ class PhoneSelfCheckTargetActivity : Activity() {
         if (original == null || !original.state.register(this, display?.displayId ?: -1, taskId)) {
             finish()
             return
+        }
+        window.setWindowAnimations(0)
+        if (Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
         }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

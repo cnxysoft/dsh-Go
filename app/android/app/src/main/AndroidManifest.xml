@@ -261,7 +261,7 @@
             android:taskAffinity=""
             android:excludeFromRecents="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
+            android:theme="@style/SelfCheckProbeTheme" />
 
         <!-- Local self-check only: App UID starts this fixed inert target on its leased display. -->
         <activity
@@ -270,7 +270,7 @@
             android:launchMode="standard"
             android:taskAffinity="${applicationId}.phone.selfcheck"
             android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+            android:theme="@style/SelfCheckTargetTheme" />
 
         <!-- The explicit companion switch enables this component. No separate process or FGS. -->
         <service android:name=".companion.NoticeListener"

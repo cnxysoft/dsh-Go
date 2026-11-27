@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ComponentName
 import android.graphics.Canvas
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +24,7 @@ class BackgroundProbeActivity : Activity() {
     private var resumed = false
     private var frameCommitted = false
     private var armed = false
+    private var armTask: Runnable? = null
     private var reportedDetached = false
     private var view: View? = null
     private val expire = Runnable { finishAndRemoveTask() }
@@ -56,6 +58,10 @@ class BackgroundProbeActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
         window.setWindowAnimations(0)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        if (Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        }
         val body = object : View(this) {
             private var frameRequested = false
             override fun onDraw(canvas: Canvas) { canvas.drawColor(Color.BLACK) }
@@ -87,29 +93,48 @@ class BackgroundProbeActivity : Activity() {
     override fun onResume() { super.onResume(); resumed = true; maybeArm() }
     override fun onPause() {
         resumed = false
+        cancelPendingArm()
         if (armed && !isFinishing) report(ProbeActivityContract.FAILED)
         super.onPause()
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) cancelPendingArm()
         if (!hasFocus && armed && !isFinishing) report(ProbeActivityContract.FAILED)
         maybeArm()
     }
 
+    private fun cancelPendingArm() {
+        armTask?.let { ui.removeCallbacks(it) }
+        armTask = null
+    }
+
     private fun actualDisplayId(): Int = windowManager.defaultDisplay.displayId
+
+    private fun readyToArm(body: View): Boolean =
+        !armed && resumed && frameCommitted && hasWindowFocus() && !isFinishing && !isDestroyed &&
+            body.isAttachedToWindow && expectedDisplay > Display.DEFAULT_DISPLAY &&
+            actualDisplayId() == expectedDisplay && body.display?.displayId == expectedDisplay
 
     private fun maybeArm() {
         val body = view ?: return
-        if (armed || !resumed || !frameCommitted || !hasWindowFocus() || isFinishing || isDestroyed ||
-            !body.isAttachedToWindow || expectedDisplay <= Display.DEFAULT_DISPLAY ||
-            actualDisplayId() != expectedDisplay || body.display?.displayId != expectedDisplay) return
-        val location = IntArray(2)
-        body.getLocationOnScreen(location)
-        armed = true
-        report(ProbeActivityContract.ARMED, Bundle().apply {
-            putInt(ProbeActivityContract.X, location[0] + body.width / 2)
-            putInt(ProbeActivityContract.Y, location[1] + body.height / 2)
-        })
+        if (!readyToArm(body) || armTask != null) return
+        // Give InputDispatcher on OEM ROMs (e.g. HyperOS) a brief settle window after the
+        // first frame and focus update before injecting the probe touch.
+        val task = Runnable {
+            armTask = null
+            val current = view ?: return@Runnable
+            if (!readyToArm(current)) return@Runnable
+            val location = IntArray(2)
+            current.getLocationOnScreen(location)
+            armed = true
+            report(ProbeActivityContract.ARMED, Bundle().apply {
+                putInt(ProbeActivityContract.X, location[0] + current.width / 2)
+                putInt(ProbeActivityContract.Y, location[1] + current.height / 2)
+            })
+        }
+        armTask = task
+        ui.postDelayed(task, 180L)
     }
 
     private fun report(code: Int, data: Bundle = Bundle()) {
@@ -119,6 +144,7 @@ class BackgroundProbeActivity : Activity() {
     }
 
     override fun onDestroy() {
+        cancelPendingArm()
         ui.removeCallbacks(expire)
         super.onDestroy()
         val decor = window.decorView
