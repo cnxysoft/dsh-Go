@@ -203,6 +203,9 @@ class RuntimeStatus {
     this.tawcEngineAvailable = false,
     this.tawcEngineActive = false,
     this.tawcRecoveryAvailable = false,
+    this.chrootEngineEnabled = false,
+    this.chrootEngineAvailable = false,
+    this.chrootEngineActive = false,
     this.currentExecutionMode,
     this.launchSelectedMode,
     this.launchSpawned = false,
@@ -285,6 +288,11 @@ class RuntimeStatus {
   /// Android can offer the opt-in launcher for the most recent PRoot failure.
   final bool tawcRecoveryAvailable;
 
+  /// Experimental native Root chroot launch (opt-in, off by default).
+  final bool chrootEngineEnabled;
+  final bool chrootEngineAvailable;
+  final bool chrootEngineActive;
+
   /// Native process observation, never inferred from the saved direct preference.
   final String? currentExecutionMode;
 
@@ -312,6 +320,9 @@ class RuntimeStatus {
     'tawcEngineEnabled': tawcEngineEnabled,
     'tawcEngineAvailable': tawcEngineAvailable,
     'tawcEngineActive': tawcEngineActive,
+    'chrootEngineEnabled': chrootEngineEnabled,
+    'chrootEngineAvailable': chrootEngineAvailable,
+    'chrootEngineActive': chrootEngineActive,
     'currentExecutionMode': currentExecutionMode,
     'launchSelectedMode': launchSelectedMode,
     'launchSpawned': launchSpawned,
@@ -371,6 +382,9 @@ class RuntimeStatus {
     tawcEngineAvailable: map['tawcEngineAvailable'] == true,
     tawcEngineActive: map['tawcEngineActive'] == true,
     tawcRecoveryAvailable: map['tawcRecoveryAvailable'] == true,
+    chrootEngineEnabled: map['chrootEngineEnabled'] == true,
+    chrootEngineAvailable: map['chrootEngineAvailable'] == true,
+    chrootEngineActive: map['chrootEngineActive'] == true,
     currentExecutionMode: map['currentExecutionMode'] as String?,
     launchSelectedMode: map['launchSelectedMode'] as String?,
     launchSpawned: map['launchSpawned'] == true,
@@ -699,6 +713,7 @@ class RuntimeBridge {
   /// Takes effect on the next start; native code rejects changes while active.
   Future<void> setDirectEngine(bool enabled) => _methods.invokeMethod<void>('setDirectEngine', {'enabled': enabled});
   Future<void> setTawcEngine(bool enabled) => _methods.invokeMethod<void>('setTawcEngine', {'enabled': enabled});
+  Future<void> setChrootEngine(bool enabled) => _methods.invokeMethod<void>('setChrootEngine', {'enabled': enabled});
 
   /// Output around the last failure, tokens masked.
   Future<List<String>> failureLog() async => (await _methods.invokeListMethod<String>('failureLog')) ?? const [];

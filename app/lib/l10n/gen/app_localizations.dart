@@ -19950,6 +19950,66 @@ abstract class L10n {
   /// **'若要挂载 /sdcard 下的目录，请先授予系统文件访问权限'**
   String get hubSettingsHostMountsGrantStorageHint;
 
+  /// No description provided for @hubSettingsLaunchMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动方式'**
+  String get hubSettingsLaunchMode;
+
+  /// No description provided for @hubSettingsChrootEngine.
+  ///
+  /// In zh, this message translates to:
+  /// **'实验性原生 Root chroot 引擎'**
+  String get hubSettingsChrootEngine;
+
+  /// No description provided for @hubSettingsChrootEngineHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'以 Root 权限在独立挂载命名空间中原生 chroot 运行 Ubuntu，无 PRoot/seccomp 开销'**
+  String get hubSettingsChrootEngineHint;
+
+  /// No description provided for @hubSettingsChrootEngineActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前正以原生 Root chroot 运行（独立挂载命名空间）'**
+  String get hubSettingsChrootEngineActive;
+
+  /// No description provided for @hubSettingsChrootEngineEnabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已开启，下次启动生效（启动失败会自动回退）'**
+  String get hubSettingsChrootEngineEnabled;
+
+  /// No description provided for @hubSettingsChrootEngineUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要本机具备 Root（su）及 unshare / chroot / mount'**
+  String get hubSettingsChrootEngineUnavailable;
+
+  /// No description provided for @hubSettingsChrootEngineConfirmTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启实验性 Root chroot 引擎？'**
+  String get hubSettingsChrootEngineConfirmTitle;
+
+  /// No description provided for @hubSettingsChrootEngineConfirmBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后引擎将通过 su 在独立挂载命名空间（unshare -m）中以原生 Root chroot 运行 Ubuntu，退出时自动卸载并恢复文件属主。若启动失败将自动回退到兼容模式，不影响已有数据。'**
+  String get hubSettingsChrootEngineConfirmBody;
+
+  /// No description provided for @hubSettingsChrootEngineEnable.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启并应用'**
+  String get hubSettingsChrootEngineEnable;
+
+  /// No description provided for @hubSettingsChrootEngineFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换 Root chroot 引擎失败，请先停止引擎后重试'**
+  String get hubSettingsChrootEngineFailed;
+
   /// No description provided for @hubSettingsVisualReplies.
   ///
   /// In zh, this message translates to:
@@ -35369,6 +35429,12 @@ abstract class L10n {
   /// In zh, this message translates to:
   /// **'挂载,目录,宿主机,工作区,绑定,/mnt/host'**
   String get searchKwHostMounts;
+
+  /// No description provided for @searchKwChrootEngine.
+  ///
+  /// In zh, this message translates to:
+  /// **'chroot,root,原生,引擎,性能,proot,tawcroot,unshare'**
+  String get searchKwChrootEngine;
 
   /// No description provided for @searchKwVisualReplies.
   ///

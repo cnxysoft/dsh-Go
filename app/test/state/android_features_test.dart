@@ -84,6 +84,7 @@ const _rows = {
   'pet-overlay-shows',
   'pet-overlay-framing',
   'auto-safe',
+  'chroot-engine',
 };
 
 final _zh = lookupL10n(AppLocale.zhCN);

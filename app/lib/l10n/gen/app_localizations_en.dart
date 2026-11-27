@@ -11389,6 +11389,38 @@ class L10nEn extends L10n {
   String get hubSettingsHostMountsGrantStorageHint => 'Required when mounting folders under /sdcard';
 
   @override
+  String get hubSettingsLaunchMode => 'Launch mode';
+
+  @override
+  String get hubSettingsChrootEngine => 'Experimental Root chroot engine';
+
+  @override
+  String get hubSettingsChrootEngineHint =>
+      'Run Ubuntu natively via Root chroot in a private mount namespace without PRoot/seccomp overhead';
+
+  @override
+  String get hubSettingsChrootEngineActive => 'Running in native Root chroot (private mount namespace)';
+
+  @override
+  String get hubSettingsChrootEngineEnabled => 'Enabled for next start (falls back automatically on failure)';
+
+  @override
+  String get hubSettingsChrootEngineUnavailable => 'Requires Root (su) plus unshare, chroot, and mount on device';
+
+  @override
+  String get hubSettingsChrootEngineConfirmTitle => 'Enable experimental Root chroot engine?';
+
+  @override
+  String get hubSettingsChrootEngineConfirmBody =>
+      'The local engine will launch via su inside a private mount namespace (unshare -m) with native Root chroot, tearing down mounts and restoring file ownership on stop. If startup fails, it automatically falls back to compatible mode without losing data.';
+
+  @override
+  String get hubSettingsChrootEngineEnable => 'Enable and apply';
+
+  @override
+  String get hubSettingsChrootEngineFailed => 'Could not switch Root chroot mode. Stop the engine and try again';
+
+  @override
   String get hubSettingsVisualReplies => 'Visual replies';
 
   @override
@@ -20308,6 +20340,9 @@ class L10nEn extends L10n {
 
   @override
   String get searchKwHostMounts => 'mount,mounts,host folder,bind,workspace,/mnt/host';
+
+  @override
+  String get searchKwChrootEngine => 'chroot,root,native,engine,performance,proot,tawcroot,unshare';
 
   @override
   String get searchKwVisualReplies => 'charts,cards,visual,options';

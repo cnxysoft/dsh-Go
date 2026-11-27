@@ -181,6 +181,7 @@ class EngineScreen extends ConsumerWidget {
                         : l10n.hubSettingsHostMountsCount(settings.hostMounts.length),
                     onTap: () => _push(context, const HostMountsPage()),
                   ),
+                if (!missing && guest) const _ChrootEngineSwitch(),
                 SettingsTile(
                   spot: SettingsIndex.entry(SettingsPageId.background),
                   subtitle: guest
@@ -208,6 +209,12 @@ class EngineScreen extends ConsumerWidget {
                   mono: true,
                 ),
                 InfoRow(label: l10n.phoneEngineArchitecture, value: status.abi ?? '—', mono: true),
+                if (status.currentExecutionMode != null || status.launchSelectedMode != null)
+                  InfoRow(
+                    label: l10n.hubSettingsLaunchMode,
+                    value: status.currentExecutionMode ?? status.launchSelectedMode ?? '—',
+                    mono: true,
+                  ),
                 ...engineCapabilityRows(l10n, ref.watch(runtimeCapabilitiesProvider).value),
               ],
             ),
@@ -223,6 +230,70 @@ class EngineScreen extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ChrootEngineSwitch extends ConsumerStatefulWidget {
+  const _ChrootEngineSwitch();
+
+  @override
+  ConsumerState<_ChrootEngineSwitch> createState() => _ChrootEngineSwitchState();
+}
+
+class _ChrootEngineSwitchState extends ConsumerState<_ChrootEngineSwitch> {
+  bool _busy = false;
+
+  Future<void> _toggle(bool next) async {
+    if (_busy) return;
+    final l10n = context.l10n;
+    if (next) {
+      final ok = await showAppDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: Text(l10n.hubSettingsChrootEngineConfirmTitle),
+          content: SingleChildScrollView(child: Text(l10n.hubSettingsChrootEngineConfirmBody)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: Text(l10n.commonCancel)),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: Text(l10n.hubSettingsChrootEngineEnable),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    setState(() => _busy = true);
+    try {
+      await EngineControl.setChrootEngine(container, enabled: next);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(l10n.hubSettingsChrootEngineFailed)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final status = ref.watch(localRuntimeProvider.select((s) => s.status));
+    final canToggle = !_busy && !status.phase.isBusy && (status.chrootEngineEnabled || status.chrootEngineAvailable);
+    final subtitle = !status.chrootEngineAvailable && !status.chrootEngineEnabled
+        ? l10n.hubSettingsChrootEngineUnavailable
+        : status.chrootEngineActive
+        ? l10n.hubSettingsChrootEngineActive
+        : status.chrootEngineEnabled
+        ? l10n.hubSettingsChrootEngineEnabled
+        : l10n.hubSettingsChrootEngineHint;
+    return SettingsSwitchTile(
+      spot: Spots.chrootEngine,
+      subtitle: subtitle,
+      value: status.chrootEngineEnabled,
+      onChanged: canToggle ? (v) => unawaited(_toggle(v)) : null,
     );
   }
 }

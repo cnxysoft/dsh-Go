@@ -182,6 +182,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         "tawcEngineActive" to (process?.executionMode == "tawcroot"),
         "tawcRecoveryAvailable" to (failure?.prootCompatibilityFailure == true && !currentModeSafe() &&
             tawcEngine().saved != true && tawcEngineUnavailable() == null),
+        "chrootEngineEnabled" to chrootEngine().enabled,
+        "chrootEngineAvailable" to (chrootEngineUnavailable() == null),
+        "chrootEngineActive" to (process?.executionMode == "chroot"),
         "currentExecutionMode" to process?.executionMode,
         "launchSelectedMode" to lastLaunch?.selectedMode,
         "launchSpawned" to (lastLaunch?.spawned == true),
@@ -210,6 +213,18 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     private fun tawcEngineUnavailable(): String? =
         TawcrootLaunch.unavailable(app.applicationInfo.nativeLibraryDir, android.os.Build.VERSION.SDK_INT)
 
+    private fun chrootEngine(): DirectLaunch.Preference {
+        val available = chrootEngineUnavailable() == null
+        return DirectLaunch.Preference(
+            // Opt-in only: never enabled unless the user explicitly turns on experimental Root chroot.
+            saved = prefs.getBoolean(K_CHROOT_ENGINE, false),
+            available = available,
+            failedRuntime = prefs.getString(K_CHROOT_FAILED, null),
+            runtime = runCatching { manifest.runtimeVersion }.getOrNull(),
+        )
+    }
+    private fun chrootEngineUnavailable(): String? = ChrootLaunch.unavailable()
+
     private fun directEngineAvailable(): Boolean = runCatching {
         manifest.raw.optJSONObject("directEngine")?.optInt("schema") == 2
     }.getOrDefault(false)
@@ -237,6 +252,17 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         val edit = prefs.edit().putBoolean(K_TAWC_ENGINE, enabled).remove(K_TAWC_FAILED)
         if (enabled) edit.putBoolean(K_DIRECT_ENGINE, false)
         edit.apply()
+        emitStatus()
+    }
+
+    /**
+     * Experimental native Root chroot launch (opt-in, off by default). Turning it on overrides
+     * tawcroot/direct for normal runs; turning it off restores the previous launch mode cleanly.
+     */
+    @Synchronized fun setChrootEngine(enabled: Boolean) {
+        check(process == null && phase !in setOf(Phase.STARTING, Phase.RUNNING, Phase.STOPPING, Phase.INSTALLING) && !resetting) { "stop the engine before changing its launch method" }
+        check(!enabled || chrootEngineUnavailable() == null) { "root chroot requires su, unshare, chroot and mount" }
+        prefs.edit().putBoolean(K_CHROOT_ENGINE, enabled).remove(K_CHROOT_FAILED).apply()
         emitStatus()
     }
 
@@ -679,6 +705,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 timeline.spawned()
                 val direct = directEngine()
                 val tawc = tawcEngine()
+                val chroot = chrootEngine()
                 val hostMounts = if (safe) emptyList() else HostMounts.prepareBinds(installer.rootfs, HostMounts.read(app)) {
                     log(it, "system")
                 }
@@ -687,13 +714,15 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 }
                 val extraBinds = (if (storage) PhoneStorage.binds() else emptyList()) + hostMounts.map { it.bindSpec }
                 p.start(env, extraBinds, safe, phone, direct.requested, direct.failed, searchOverlay, authOverlay, speechOverlay,
-                    tawcEngine = tawc.saved == true, tawcFailed = tawc.failed) { actualDirect ->
+                    tawcEngine = tawc.saved == true, tawcFailed = tawc.failed,
+                    chrootEngine = chroot.saved == true, chrootFailed = chroot.failed) { actualDirect ->
                     // SafeMode.prepare writes its own briefing; leave the original home untouched.
                     if (!safe) GuestSetup.writeAgentsMd(
                         installer.rootfs, storage, phone && PhoneControl.switchedOn(app), pendingVisualReplies, actualDirect,
                         nativeLocale = if (AppStrings.isEnglish(app)) "en" else "zh-CN",
                         managedAgentsMd = pendingManagedAgentsMd,
                         hostMounts = hostMounts,
+                        chrootEngine = p.chroot,
                     )
                 }
                 if (phone) PhoneControl.get(app).launched(p.phoneMounted)
@@ -707,6 +736,17 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     if (gen != runGen) return@execute
                     process = null
                     PhoneControl.get(app).onEngineStopped()
+                    if (launched?.chroot == true && stopGen < gen && !resetting) {
+                        val runtime = manifest.runtimeVersion
+                        if (prefs.getString(K_CHROOT_FAILED, null) != runtime) {
+                            prefs.edit().putString(K_CHROOT_FAILED, runtime).apply()
+                            log("[dsh-app] chroot launch failed (${e.message ?: e.javaClass.simpleName}); starting again with compatible launch", "system")
+                            error = null
+                            setPhase(Phase.STARTING)
+                            restartNow("with compatible launch")
+                        }
+                        return@execute
+                    }
                     if (launched?.tawc == true && stopGen < gen && !resetting) {
                         // A tawcroot start that threw: the same fallback as onExit's, unless
                         // onExit (through awaitExit) already took it.
@@ -813,6 +853,12 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 // outlive its launcher; do not retire their rootfs while any still remain.
                 val cleanup = DshProcess(app, manifest, installer.rootfs, this).reapStrays()
                 check(cleanup.complete) { "runtime stop incomplete; retry reset after cleanup" }
+                if (prefs.getBoolean(K_CHROOT_ENGINE, false) || File(installer.rootfs, ChrootLaunch.PID_FILE).exists()) {
+                    ChrootLaunch.findSu()?.let { su ->
+                        val uid = android.os.Process.myUid()
+                        ChrootLaunch.stopAndCleanup(su, installer.rootfs, uid, uid)
+                    }
+                }
                 lastLaunch = null
                 try {
                     check(runtimeLogs.pauseDisk()) { "log reset pause timed out" }
@@ -1185,6 +1231,14 @@ class RuntimeController private constructor(private val app: Context) : DshProce
             token = null
             healthyAt = null
             log("[dsh-app] DSH exited with code $code", "system")
+            if (source.chroot && readyAt == null && !expected && stopGen < runGen) {
+                prefs.edit().putString(K_CHROOT_FAILED, manifest.runtimeVersion).apply()
+                log("[dsh-app] chroot launch failed (exit $code${source.startupError?.let { ": $it" } ?: ""}); starting again with compatible launch", "system")
+                error = null
+                setPhase(Phase.STARTING)
+                restartNow("with compatible launch")
+                return
+            }
             if (source.tawc && readyAt == null && !expected && stopGen < runGen) {
                 // tawcroot never got DSH up: PRoot from now on with this runtime, no failure card,
                 // no strike. A new runtime, or turning tawcroot on again, gives it another try.
@@ -1324,6 +1378,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         private const val K_TAWC_ENGINE = "tawcEngine"
         /** Runtime version tawcroot failed to start DSH with. */
         private const val K_TAWC_FAILED = "tawcEngineFailedRuntime"
+        private const val K_CHROOT_ENGINE = "chrootEngine"
+        /** Runtime version native Root chroot failed to start DSH with. */
+        private const val K_CHROOT_FAILED = "chrootEngineFailedRuntime"
         private const val MAIN_FAILURE_LOG = "failure-normal.log"
         private const val LATEST_FAILURE_LOG = "failure-latest.log"
 

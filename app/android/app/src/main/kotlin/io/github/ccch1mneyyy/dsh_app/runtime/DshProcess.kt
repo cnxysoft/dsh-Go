@@ -74,6 +74,12 @@ class DshProcess(
     var tawc: Boolean = false
         private set
 
+    /** This process runs under experimental native Root chroot ([ChrootLaunch]); fixed before it can be spawned. */
+    var chroot: Boolean = false
+        private set
+
+    private var chrootSu: String? = null
+
     val launchDiagnostics = LaunchDiagnostics()
     val executionMode: String? get() = launchDiagnostics.currentMode(process?.isAlive == true)
 
@@ -84,27 +90,40 @@ class DshProcess(
      * [binds] are extra proot `-b host:guest` mounts, inserted before the guest command.
      * [safe] boots the rescue profile instead of `web` (see [SafeMode.profileArg]).
      */
-    fun start(guestEnv: Map<String, String>, binds: List<String> = emptyList(), safe: Boolean = false, phone: Boolean = false, directEngine: Boolean = false, directFailed: Boolean = false, searchOverlay: Boolean = false, authOverlay: Boolean = false, speechOverlay: Boolean = false, tawcEngine: Boolean = false, tawcFailed: Boolean = false, onLaunchMethod: ((Boolean) -> Unit)? = null) {
+    fun start(guestEnv: Map<String, String>, binds: List<String> = emptyList(), safe: Boolean = false, phone: Boolean = false, directEngine: Boolean = false, directFailed: Boolean = false, searchOverlay: Boolean = false, authOverlay: Boolean = false, speechOverlay: Boolean = false, tawcEngine: Boolean = false, tawcFailed: Boolean = false, chrootEngine: Boolean = false, chrootFailed: Boolean = false, onLaunchMethod: ((Boolean) -> Unit)? = null) {
         check(process == null) { "already started" }
-        // tawcroot wins over Direct when both are on; like Direct it needs PRoot's fake hard links gone.
-        val tawcWanted = tawcEngine && !safe
+        // If a previous chroot launch left a marker behind (e.g. app killed), clean up root strays & ownership first.
+        if (File(rootfs, ChrootLaunch.PID_FILE).exists()) {
+            ChrootLaunch.findSu()?.let { su ->
+                val uid = AndroidProcess.myUid()
+                ChrootLaunch.stopAndCleanup(su, rootfs, uid, uid)
+            }
+        }
+        // Priority: opt-in chroot > tawcroot > direct > proot. All three need PRoot's fake hard links gone.
+        val chrootWanted = chrootEngine && !safe
+        val chrootMissing = if (chrootWanted) ChrootLaunch.unavailable() else null
+        val chrootReady = chrootWanted && !chrootFailed && chrootMissing == null
+        val tawcWanted = !chrootReady && tawcEngine && !safe
         val tawcMissing = if (tawcWanted) TawcrootLaunch.unavailable(context.applicationInfo.nativeLibraryDir, android.os.Build.VERSION.SDK_INT) else null
         val tawcReady = tawcWanted && !tawcFailed && tawcMissing == null
-        var selection = if (tawcReady) DirectLaunch.select(rootfs, requested = true, safe = false)
+        var selection = if (chrootReady || tawcReady) DirectLaunch.select(rootfs, requested = true, safe = false)
             else DirectLaunch.select(rootfs, directEngine, safe, directFailed)
         // Only PRoot's fake hard links stand in the way: tidy them once no runtime process is left.
         val tidy = selection.fallbackReason == DirectLaunch.INCOMPATIBLE
         val cleanup = reapStrays(allowObservationGap = true)
         if (tidy && cleanup.complete) selection = tidyLinks(binds)
-        tawc = tawcReady && selection.direct
-        direct = selection.direct && !tawcReady
+        chroot = chrootReady && selection.direct
+        tawc = !chroot && tawcReady && selection.direct
+        direct = !chroot && !tawc && selection.direct
         directFallbackReason = selection.fallbackReason ?: when {
+            chrootWanted && chrootFailed -> ChrootLaunch.FAILED
+            chrootMissing != null -> chrootMissing
             tawcWanted && tawcFailed -> TawcrootLaunch.FAILED
             tawcMissing != null -> tawcMissing
-            (directEngine || tawcEngine) && safe -> "safeRecovery"
+            (directEngine || tawcEngine || chrootEngine) && safe -> "safeRecovery"
             else -> null
         }
-        launchDiagnostics.selected(if (tawc) "tawcroot" else if (direct) "direct" else "proot", directFallbackReason)
+        launchDiagnostics.selected(if (chroot) "chroot" else if (tawc) "tawcroot" else if (direct) "direct" else "proot", directFallbackReason)
         check(!cleanup.ownedRemaining) { "runtime cleanup incomplete; stop the engine and retry" }
         if (!cleanup.complete) listener.onLog("[dsh-app] starting with incomplete process observation; no captured runtime identities remain", "system")
         val pidFile = File(rootfs, "tmp/dsh-web.pid")
@@ -180,6 +199,18 @@ class DshProcess(
         env["PROOT_TMP_DIR"] = tmp.absolutePath
         manifest.launchEnv.forEach { (k, v) -> env[k] = expand(v) }
         if (!guestEnvPlaced) env.putAll(effectiveGuestEnv)
+        val chrootPlan = if (!chroot) null else try {
+            val su = ChrootLaunch.findSu() ?: throw ChrootLaunch.Unsupported(ChrootLaunch.NO_SU)
+            chrootSu = su
+            ChrootLaunch.prepare(su, rootfs.canonicalPath, context.applicationInfo.nativeLibraryDir, argv, env.toMap())
+        } catch (e: ChrootLaunch.Unsupported) {
+            listener.onLog("[dsh-app] chroot fallback: ${e.message}; compatible launch this time", "system")
+            chroot = false
+            chrootSu = null
+            directFallbackReason = ChrootLaunch.UNSUPPORTED
+            launchDiagnostics.selected("proot", directFallbackReason)
+            null
+        }
         val tawcPlan = if (!tawc) null else try {
             TawcrootLaunch.prepare(rootfs.canonicalPath, context.applicationInfo.nativeLibraryDir, argv, env.toMap())
         } catch (e: TawcrootLaunch.Unsupported) {
@@ -206,12 +237,18 @@ class DshProcess(
             env.clear()
             env.putAll(tawcPlan.environment)
         }
+        if (chrootPlan != null) {
+            builder.command(chrootPlan.argv).directory(File("/"))
+            env.clear()
+            env.putAll(chrootPlan.environment)
+        }
 
         readyReported = false
         if (directFallbackReason == DirectLaunch.INCOMPATIBLE) listener.onLog("[dsh-app] direct fallback: proot hard-link backing files need compatible launch; user preference and data retained", "system")
         if (directFallbackReason == DirectLaunch.FAILED) listener.onLog("[dsh-app] direct fallback: direct launch failed before with this runtime; turn Direct on again to retry", "system")
         if (directFallbackReason == TawcrootLaunch.FAILED) listener.onLog("[dsh-app] tawcroot fallback: tawcroot failed to start before with this runtime; turn tawcroot on again to retry", "system")
-        listener.onLog("[dsh-app] launch method: ${if (tawc) "tawcroot" else if (direct) "direct-glibc" else "proot"}${if ((directEngine || tawcEngine) && safe) " (safe recovery)" else ""}", "system")
+        if (directFallbackReason == ChrootLaunch.FAILED) listener.onLog("[dsh-app] chroot fallback: chroot failed to start before with this runtime; turn Root chroot on again to retry", "system")
+        listener.onLog("[dsh-app] launch method: ${if (chroot) "chroot" else if (tawc) "tawcroot" else if (direct) "direct-glibc" else "proot"}${if ((directEngine || tawcEngine || chrootEngine) && safe) " (safe recovery)" else ""}", "system")
         listener.onLog("[dsh-app] launching ${builder.command().joinToString(" ") { redact(it) }}", "system")
         // stop() came in while this was being prepared: don't launch at all.
         if (stopping) {
@@ -222,6 +259,17 @@ class DshProcess(
         val p = builder.start()
         process = p
         launchDiagnostics.spawned()
+        if (chrootPlan != null) {
+            // Feed the bootstrap script (and guest env) over stdin so no secrets appear in cmdline or logs.
+            try {
+                p.outputStream.use { out ->
+                    out.write(chrootPlan.stdinScript.toByteArray(Charsets.UTF_8))
+                    out.flush()
+                }
+            } catch (e: IOException) {
+                listener.onLog("[dsh-app] chroot bootstrap write failed: ${e.message}", "system")
+            }
+        }
         val out = pump(p.inputStream.bufferedReader(), "stdout")
         val err = pump(p.errorStream.bufferedReader(), "stderr")
         waiter = thread(name = "dsh-wait", isDaemon = true) {
@@ -241,7 +289,10 @@ class DshProcess(
             stopThread?.join()
             // An unexpected parent exit can leave tracees behind too. Keep the
             // controller's ownership until this UID sweep has finished.
-            if (stopThread == null) killStrays()
+            if (stopThread == null) {
+                cleanupChrootIfUsed()
+                killStrays()
+            }
             listener.onExit(this, code, expectedExit)
         }
         // The port deadline starts only after a token. A stuck loader/Node can emit nothing.
@@ -341,24 +392,37 @@ class DshProcess(
         val p = process ?: return
         stopper = thread(name = "dsh-stop", isDaemon = true) {
             try {
-                val node = if (p.isAlive) guestRecord() else null
-                val proot = if (direct || tawc) null else node?.let { child -> processSnapshot().records.firstOrNull { it.pid == child.parent && it.proot } }
-                if (node != null) signalOwned(node, OsConstants.SIGTERM)
-                else if ((direct || tawc) && p.isAlive) p.destroy() // loader/preload may fail before writing its pid file
-                if (!waitExit(p, 5000) && proot != null) signalOwned(proot, OsConstants.SIGQUIT)
-                // Tawcroot needs no extra QUIT grace; retain PRoot and Direct's existing wait.
-                if (!tawc) waitExit(p, 2000)
+                if (chroot) {
+                    cleanupChrootIfUsed()
+                    waitExit(p, 2000)
+                } else {
+                    val node = if (p.isAlive) guestRecord() else null
+                    val proot = if (direct || tawc) null else node?.let { child -> processSnapshot().records.firstOrNull { it.pid == child.parent && it.proot } }
+                    if (node != null) signalOwned(node, OsConstants.SIGTERM)
+                    else if ((direct || tawc) && p.isAlive) p.destroy() // loader/preload may fail before writing its pid file
+                    if (!waitExit(p, 5000) && proot != null) signalOwned(proot, OsConstants.SIGQUIT)
+                    // Tawcroot needs no extra QUIT grace; retain PRoot and Direct's existing wait.
+                    if (!tawc) waitExit(p, 2000)
+                }
             } finally {
                 try {
                     if (p.isAlive) p.destroyForcibly()
                 } finally {
                     // Reap tracees before waiting: an OEM Process.waitFor may not
                     // return until they exit. The waiter still retains this owner.
+                    if (chroot) cleanupChrootIfUsed()
                     killStrays()
                     p.waitFor()
                 }
             }
         }
+    }
+
+    private fun cleanupChrootIfUsed() {
+        if (!chroot && !File(rootfs, ChrootLaunch.PID_FILE).exists()) return
+        val su = chrootSu ?: ChrootLaunch.findSu() ?: return
+        val uid = AndroidProcess.myUid()
+        ChrootLaunch.stopAndCleanup(su, rootfs, uid, uid)
     }
 
     private fun waitExit(p: Process, millis: Long): Boolean {

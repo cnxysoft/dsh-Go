@@ -42,6 +42,17 @@ abstract final class EngineControl {
     }
   }
 
+  /// Toggles the experimental Root chroot engine; stops first when running and
+  /// restarts afterward if the engine was previously running.
+  static Future<void> setChrootEngine(ProviderContainer container, {required bool enabled}) async {
+    final wasRunning = container.read(localRuntimeProvider).status.phase == RuntimePhase.running;
+    if (!await _stopAndWait(container)) throw PlatformException(code: 'runtime_not_stopped');
+    await container.read(runtimeBridgeProvider).setChrootEngine(enabled);
+    if (wasRunning && !await _restart(container)) {
+      throw PlatformException(code: 'runtime_not_stopped_after_recovery');
+    }
+  }
+
   /// Starts the engine unless it is already starting or running.
   static Future<void> ensureStarted(ProviderContainer container) async {
     final phase = container.read(localRuntimeProvider).status.phase;

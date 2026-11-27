@@ -10756,6 +10756,37 @@ class L10nZh extends L10n {
   String get hubSettingsHostMountsGrantStorageHint => '若要挂载 /sdcard 下的目录，请先授予系统文件访问权限';
 
   @override
+  String get hubSettingsLaunchMode => '启动方式';
+
+  @override
+  String get hubSettingsChrootEngine => '实验性原生 Root chroot 引擎';
+
+  @override
+  String get hubSettingsChrootEngineHint => '以 Root 权限在独立挂载命名空间中原生 chroot 运行 Ubuntu，无 PRoot/seccomp 开销';
+
+  @override
+  String get hubSettingsChrootEngineActive => '当前正以原生 Root chroot 运行（独立挂载命名空间）';
+
+  @override
+  String get hubSettingsChrootEngineEnabled => '已开启，下次启动生效（启动失败会自动回退）';
+
+  @override
+  String get hubSettingsChrootEngineUnavailable => '需要本机具备 Root（su）及 unshare / chroot / mount';
+
+  @override
+  String get hubSettingsChrootEngineConfirmTitle => '开启实验性 Root chroot 引擎？';
+
+  @override
+  String get hubSettingsChrootEngineConfirmBody =>
+      '开启后引擎将通过 su 在独立挂载命名空间（unshare -m）中以原生 Root chroot 运行 Ubuntu，退出时自动卸载并恢复文件属主。若启动失败将自动回退到兼容模式，不影响已有数据。';
+
+  @override
+  String get hubSettingsChrootEngineEnable => '开启并应用';
+
+  @override
+  String get hubSettingsChrootEngineFailed => '切换 Root chroot 引擎失败，请先停止引擎后重试';
+
+  @override
   String get hubSettingsVisualReplies => '可视化回复';
 
   @override
@@ -19236,6 +19267,9 @@ class L10nZh extends L10n {
 
   @override
   String get searchKwHostMounts => '挂载,目录,宿主机,工作区,绑定,/mnt/host';
+
+  @override
+  String get searchKwChrootEngine => 'chroot,root,原生,引擎,性能,proot,tawcroot,unshare';
 
   @override
   String get searchKwVisualReplies => '图表,卡片,可视化,选项';

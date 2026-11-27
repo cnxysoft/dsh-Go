@@ -41,6 +41,7 @@
   "searchKwAutoCommands": "don't ask,auto approve,full access,no confirmation",
   "searchKwPhoneFiles": "storage,files,downloads,photos",
   "searchKwHostMounts": "mount,mounts,host folder,bind,workspace,/mnt/host",
+  "searchKwChrootEngine": "chroot,root,native,engine,performance,proot,tawcroot,unshare",
   "searchKwVisualReplies": "charts,cards,visual,options",
   "searchKwManagedAgentsMd": "AGENTS.md,prompt,environment,inject,persona,context",
   "searchKwTextSize": "font,font size,text size,larger text",

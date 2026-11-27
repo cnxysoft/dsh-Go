@@ -1172,6 +1172,14 @@ abstract final class Spots {
     altTitle: (l) => l.workspaceRecoveryDisable,
     keywords: (l) => l.searchKwWorkspaceRecovery,
   );
+  static final chrootEngine = SettingSpot(
+    'chroot-engine',
+    page: SettingsPageId.engine,
+    title: (l) => l.hubSettingsChrootEngine,
+    keywords: (l) => l.searchKwChrootEngine,
+    condition: SpotCondition.localHost,
+    androidOnly: true,
+  );
   static final engineReset = SettingSpot(
     'engine-reset',
     page: SettingsPageId.engine,
@@ -1339,6 +1347,7 @@ final _rows = <SettingSpot>[
   Spots.autoSafe,
   Spots.safeMode,
   Spots.workspaceRecovery,
+  Spots.chrootEngine,
   Spots.engineReset,
   Spots.engineUninstall,
   Spots.addSshHost,

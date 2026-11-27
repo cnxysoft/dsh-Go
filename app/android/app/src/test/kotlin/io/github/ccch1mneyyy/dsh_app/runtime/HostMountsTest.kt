@@ -104,4 +104,33 @@ class HostMountsTest {
             sandbox.deleteRecursively()
         }
     }
+
+    @Test fun prepareBindsPrunesStaleEmptyMountPointsButPreservesNonEmptyDirs() {
+        val sandbox = Files.createTempDirectory("dsh-host-mounts-prune").toFile()
+        try {
+            val rootfs = File(sandbox, "rootfs").apply { mkdirs() }
+            val keepHost = File(sandbox, "keep").apply { mkdirs() }
+            val staleEmpty = File(rootfs, "mnt/host/removed").apply { mkdirs() }
+            val nonEmpty = File(rootfs, "mnt/host/has-files").apply { mkdirs() }
+            val userFile = File(nonEmpty, "keep.txt").apply { writeText("do not delete") }
+
+            HostMounts.prepareBinds(rootfs, listOf(HostMounts.Entry("keep", keepHost.absolutePath)))
+            assertTrue(File(rootfs, "mnt/host/keep").isDirectory)
+            assertFalse(staleEmpty.exists())
+            assertTrue(userFile.isFile)
+
+            // Removing all mounts deletes empty stub 'keep', keeps 'has-files', and leaves mnt/host while non-empty.
+            HostMounts.prepareBinds(rootfs, emptyList())
+            assertFalse(File(rootfs, "mnt/host/keep").exists())
+            assertTrue(userFile.isFile)
+
+            // Once all non-empty dirs are gone and no mounts remain, empty mnt/host itself is removed.
+            userFile.delete()
+            nonEmpty.delete()
+            HostMounts.prepareBinds(rootfs, emptyList())
+            assertFalse(File(rootfs, "mnt/host").exists())
+        } finally {
+            sandbox.deleteRecursively()
+        }
+    }
 }

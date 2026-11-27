@@ -170,6 +170,7 @@ object GuestSetup {
         nativeLocale: String = "zh-CN",
         managedAgentsMd: Boolean = true,
         hostMounts: List<HostMounts.Entry> = emptyList(),
+        chrootEngine: Boolean = false,
     ) {
         try {
             val file = File(rootfs, "root/.dsh/AGENTS.md")
@@ -187,7 +188,14 @@ object GuestSetup {
                 existing?.startsWith(AGENTS_MARKER) != true) return
             val english = nativeLocale == "en"
             val instructions = if (english) AGENTS_MD_EN else AGENTS_MD
-            val environment = if (directEngine) {
+            val environment = if (chrootEngine) {
+                if (english) {
+                    instructions.replace(DIRECT_ENVIRONMENT_FROM_EN, "Ubuntu 24.04 environment (native Root chroot)")
+                } else {
+                    // l10n:keep agent prompt
+                    instructions.replace("Ubuntu 24.04 环境里（proot，免 Root）", "Ubuntu 24.04 环境里（原生 Root chroot）")
+                }
+            } else if (directEngine) {
                 val directInstructions = if (english) {
                     instructions.replace(DIRECT_ENVIRONMENT_FROM_EN, DIRECT_ENVIRONMENT_TO_EN)
                 } else {

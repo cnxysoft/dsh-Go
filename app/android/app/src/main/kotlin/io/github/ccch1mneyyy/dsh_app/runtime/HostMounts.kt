@@ -2,6 +2,7 @@ package io.github.ccch1mneyyy.dsh_app.runtime
 
 import android.content.Context
 import java.io.File
+import java.nio.file.Files
 
 /**
  * User-configured Android host folders bind-mounted under `/mnt/host/<name>` inside the local
@@ -95,10 +96,10 @@ object HostMounts {
 
     /**
      * Filters [entries] to directories that exist, are readable right now, and do not overlap
-     * [rootfs], ensuring each guest mount-point directory exists under [rootfs].
+     * [rootfs], ensuring each guest mount-point directory exists under [rootfs] and pruning stale
+     * empty mount-point directories left behind by removed or skipped mounts.
      */
     fun prepareBinds(rootfs: File, entries: List<Entry>, log: (String) -> Unit = {}): List<Entry> {
-        if (entries.isEmpty()) return emptyList()
         val rootPaths = linkedSetOf(
             normalizeHostPath(rootfs.absolutePath),
             runCatching { normalizeHostPath(rootfs.canonicalPath) }.getOrNull(),
@@ -122,7 +123,26 @@ object HostMounts {
             }
             active += entry
         }
+        cleanupStaleMountPoints(rootfs, active.mapTo(HashSet()) { it.name })
         return active
+    }
+
+    /**
+     * Removes empty stub directories under `rootfs/mnt/host` that are no longer in [activeNames].
+     * Never deletes symlinks or non-empty directories, so real files written inside rootfs are safe.
+     */
+    private fun cleanupStaleMountPoints(rootfs: File, activeNames: Set<String>) {
+        val hostRoot = File(rootfs, GUEST_PREFIX.removePrefix("/"))
+        if (!hostRoot.isDirectory || Files.isSymbolicLink(hostRoot.toPath())) return
+        for (child in hostRoot.listFiles().orEmpty()) {
+            if (child.name in activeNames) continue
+            if (!Files.isSymbolicLink(child.toPath()) && child.isDirectory && child.list()?.isEmpty() == true) {
+                child.delete()
+            }
+        }
+        if (activeNames.isEmpty() && hostRoot.list()?.isEmpty() == true) {
+            hostRoot.delete()
+        }
     }
 
     private fun overlapsAny(path: String, roots: List<String>): Boolean =
