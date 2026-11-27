@@ -473,9 +473,9 @@ class PhoneCore(
         var requestedApp = selectedApp
         when (name) {
             PhoneToolCatalog.ANDROID_SHELL -> {
-                if (PhoneAndroidShell.parse(a) == null) return Either.Left(Out(
+                if (PhoneAndroidShell.parse(a, env.androidShellLimits()) == null) return Either.Left(Out(
                     Json.write(PhoneAndroidShell.failure("invalidArguments")), error = true))
-                if (env.isLocked()) return Either.Left(Out(
+                if (env.isLocked() && !env.androidShellAllowWhenLocked()) return Either.Left(Out(
                     Json.write(PhoneAndroidShell.failure("locked")), error = true))
             }
             PhoneToolCatalog.OPEN -> {
