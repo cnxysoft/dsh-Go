@@ -80,7 +80,17 @@ internal class PhoneSelfCheck(
             sessions.releaseSelfCheck(lease) // No peer was pinned and no operation was dispatched.
             return abandonStart(ticket, Reason.CHANNEL_UNAVAILABLE)
         }
-        val run = Run(client, live, lease, borrow, profile, host)
+        val run = try {
+            Run(client, live, lease, borrow, profile, host)
+        } catch (_: IllegalStateException) {
+            background.releaseSelfCheckBorrow(borrow)
+            sessions.releaseSelfCheck(lease)
+            return abandonStart(ticket, Reason.TARGET_CLEANUP_PENDING)
+        } catch (_: Throwable) {
+            background.releaseSelfCheckBorrow(borrow)
+            sessions.releaseSelfCheck(lease)
+            return abandonStart(ticket, Reason.UNAVAILABLE)
+        }
         val accepted = synchronized(lock) {
             val active = !ticket.cancelled && ticket.live()
             starting = null

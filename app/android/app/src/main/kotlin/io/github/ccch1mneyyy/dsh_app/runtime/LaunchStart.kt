@@ -20,6 +20,7 @@ object LaunchStart {
     private const val FLUTTER_PREFS = "FlutterSharedPreferences"
     private const val K_PHONE_STORAGE = "flutter.phone_storage"
     private const val K_VISUAL_REPLIES = "flutter.visual_replies"
+    private const val K_MANAGED_AGENTS_MD = "flutter.managed_agents_md"
 
     @Volatile private var tried = false
 
@@ -66,6 +67,7 @@ object LaunchStart {
                 phoneStorage = prefs.getBoolean(K_PHONE_STORAGE, false),
                 mode = null,
                 visualReplies = prefs.getBoolean(K_VISUAL_REPLIES, true),
+                managedAgentsMd = prefs.getBoolean(K_MANAGED_AGENTS_MD, true),
             )
             decided = true
         } catch (_: Exception) {

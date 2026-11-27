@@ -35,6 +35,7 @@ class _Bridge extends RuntimeBridge {
     bool phoneStorage = false,
     EngineMode? mode,
     bool visualReplies = true,
+    bool managedAgentsMd = true,
   }) async {
     if (startError case final error?) throw error;
   }

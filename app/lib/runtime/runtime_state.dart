@@ -192,7 +192,11 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
   Future<void> start() {
     final settings = ref.read(settingsProvider);
     return _startOrReopen(
-      () => _bridge.start(phoneStorage: settings.phoneStorage, visualReplies: settings.visualReplies),
+      () => _bridge.start(
+        phoneStorage: settings.phoneStorage,
+        visualReplies: settings.visualReplies,
+        managedAgentsMd: settings.managedAgentsMd,
+      ),
     );
   }
 
@@ -200,7 +204,12 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
   Future<void> startIn(EngineMode mode) {
     final settings = ref.read(settingsProvider);
     return _startOrReopen(
-      () => _bridge.start(phoneStorage: settings.phoneStorage, visualReplies: settings.visualReplies, mode: mode),
+      () => _bridge.start(
+        phoneStorage: settings.phoneStorage,
+        visualReplies: settings.visualReplies,
+        managedAgentsMd: settings.managedAgentsMd,
+        mode: mode,
+      ),
     );
   }
 

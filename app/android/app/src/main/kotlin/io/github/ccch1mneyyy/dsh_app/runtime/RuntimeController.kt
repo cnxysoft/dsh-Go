@@ -85,6 +85,13 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     @Volatile private var pendingPhoneStorage = false
     /** Whether the managed AGENTS.md tells the model about ```dsh-ui views (settings, on by default). */
     @Volatile private var pendingVisualReplies = true
+    /** Whether engine start writes the app-managed $DSH_HOME/AGENTS.md (settings, on by default). */
+    @Volatile private var pendingManagedAgentsMd = readManagedAgentsMdPref()
+
+    private fun readManagedAgentsMdPref(): Boolean = runCatching {
+        app.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            .getBoolean("flutter.managed_agents_md", true)
+    }.getOrDefault(true)
 
     // Safe mode and failure detection. State that must survive the app being killed lives in [prefs].
     @Volatile private var safeState = SafeState.parse(prefs.getString(K_SAFE_STATE, null))
@@ -311,9 +318,11 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         phoneStorage: Boolean = false,
         mode: String? = null,
         visualReplies: Boolean = pendingVisualReplies,
+        managedAgentsMd: Boolean = pendingManagedAgentsMd,
     ) {
         pendingPhoneStorage = phoneStorage
         pendingVisualReplies = visualReplies
+        pendingManagedAgentsMd = managedAgentsMd
         if (phase == Phase.RUNNING || phase == Phase.STARTING) {
             serviceRecovery.request(RuntimeServiceRecovery.Snapshot(phoneStorage, visualReplies), pendingEnv.isNotEmpty(), newStart = false)
             return
@@ -342,6 +351,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         }
         pendingPhoneStorage = options.phoneStorage
         pendingVisualReplies = options.visualReplies
+        if (recreated) pendingManagedAgentsMd = readManagedAgentsMdPref()
         return true
     }
 
@@ -675,6 +685,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     if (!safe) GuestSetup.writeAgentsMd(
                         installer.rootfs, storage, phone && PhoneControl.switchedOn(app), pendingVisualReplies, actualDirect,
                         nativeLocale = if (AppStrings.isEnglish(app)) "en" else "zh-CN",
+                        managedAgentsMd = pendingManagedAgentsMd,
                     )
                 }
                 if (phone) PhoneControl.get(app).launched(p.phoneMounted)

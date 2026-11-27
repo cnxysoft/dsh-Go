@@ -645,11 +645,13 @@ class RuntimeBridge {
     bool phoneStorage = false,
     EngineMode? mode,
     bool visualReplies = true,
+    bool managedAgentsMd = true,
   }) => _methods.invokeMethod<void>('start', {
     'env': env,
     'phoneStorage': phoneStorage,
     'mode': mode?.name,
     'visualReplies': visualReplies,
+    'managedAgentsMd': managedAgentsMd,
   });
 
   Future<LastKnownGood> lastKnownGood() async {

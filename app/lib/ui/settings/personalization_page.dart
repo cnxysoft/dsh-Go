@@ -38,8 +38,7 @@ class PersonalizationPage extends ConsumerWidget {
 
   /// The engine reads its instructions at launch, so the switch takes effect on
   /// the next start; offer one now rather than restarting behind the user's back.
-  Future<void> _onVisualReplies(BuildContext context, WidgetRef ref, bool next) async {
-    await ref.read(settingsProvider.notifier).setVisualReplies(next);
+  Future<void> _promptRestart(BuildContext context, WidgetRef ref) async {
     if (!context.mounted || ref.read(localRuntimeProvider).status.phase != RuntimePhase.running) return;
     final container = ProviderScope.containerOf(context, listen: false);
     ScaffoldMessenger.of(context)
@@ -54,6 +53,18 @@ class PersonalizationPage extends ConsumerWidget {
           ),
         ),
       );
+  }
+
+  Future<void> _onVisualReplies(BuildContext context, WidgetRef ref, bool next) async {
+    await ref.read(settingsProvider.notifier).setVisualReplies(next);
+    if (!context.mounted) return;
+    await _promptRestart(context, ref);
+  }
+
+  Future<void> _onManagedAgentsMd(BuildContext context, WidgetRef ref, bool next) async {
+    await ref.read(settingsProvider.notifier).setManagedAgentsMd(next);
+    if (!context.mounted) return;
+    await _promptRestart(context, ref);
   }
 
   @override
@@ -85,6 +96,12 @@ class PersonalizationPage extends ConsumerWidget {
                 subtitle: l10n.hubSettingsVisualRepliesHint,
                 value: ref.watch(settingsProvider.select((s) => s.visualReplies)),
                 onChanged: (v) => unawaited(_onVisualReplies(context, ref, v)),
+              ),
+              SettingsSwitchTile(
+                spot: Spots.managedAgentsMd,
+                subtitle: l10n.hubSettingsManagedAgentsMdHint,
+                value: ref.watch(settingsProvider.select((s) => s.managedAgentsMd)),
+                onChanged: (v) => unawaited(_onManagedAgentsMd(context, ref, v)),
               ),
             ],
           ),

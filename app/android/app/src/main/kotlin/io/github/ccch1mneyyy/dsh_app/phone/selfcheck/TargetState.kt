@@ -119,6 +119,14 @@ internal class TargetState(val targetRun: String, val profile: TargetContract.Pr
         true
     }
 
+    /** Called after teardown barrier when Android has already removed the finished task from appTasks. */
+    fun observeTaskRemoved(readStamp: Any?): Boolean = synchronized(lock) {
+        if (!created || !destroyedForFinish || readStamp == null || readStamp !== destroyedStamp) return false
+        taskEmpty = true
+        lock.notifyAll()
+        true
+    }
+
     fun facts(): Facts = synchronized(lock) {
         val closed = finalized || sealed && launchFinished &&
             (!attempted && !created || created && destroyedForFinish && taskEmpty)

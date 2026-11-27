@@ -46,6 +46,8 @@
   "hubSettingsPhoneFilesHint": "AI 可读写手机存储",
   "hubSettingsVisualReplies": "可视化回复",
   "hubSettingsVisualRepliesHint": "图表、对比卡和可点的选项",
+  "hubSettingsManagedAgentsMd": "注入 DSH Go 环境说明",
+  "hubSettingsManagedAgentsMdHint": "启动时写入托管 AGENTS.md；关闭保持上下文纯净，不触碰自定义文件",
   "hubSettingsPhoneControl": "手机操控",
   "hubSettingsPhoneControlHint": "看屏幕、帮你点按",
   "hubSettingsPreferences": "个人偏好",

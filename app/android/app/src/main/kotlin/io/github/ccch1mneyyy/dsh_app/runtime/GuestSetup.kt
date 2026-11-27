@@ -168,6 +168,7 @@ object GuestSetup {
         visualReplies: Boolean = true,
         directEngine: Boolean = false,
         nativeLocale: String = "zh-CN",
+        managedAgentsMd: Boolean = true,
     ) {
         try {
             val file = File(rootfs, "root/.dsh/AGENTS.md")
@@ -175,6 +176,12 @@ object GuestSetup {
                 rootfs, "/root/.dsh/AGENTS.md", phoneRoot = PhoneStorage.GUEST_PATH,
             )
             val existing = source?.readText()
+            if (!managedAgentsMd) {
+                if (existing?.startsWith(AGENTS_MARKER) == true) {
+                    Files.deleteIfExists(file.toPath())
+                }
+                return
+            }
             if (Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS) &&
                 existing?.startsWith(AGENTS_MARKER) != true) return
             val english = nativeLocale == "en"

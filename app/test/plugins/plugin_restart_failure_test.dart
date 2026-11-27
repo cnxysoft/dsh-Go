@@ -54,6 +54,7 @@ class RestartBridge extends RuntimeBridge {
     bool phoneStorage = false,
     EngineMode? mode,
     bool visualReplies = true,
+    bool managedAgentsMd = true,
   }) async {
     calls.add('start');
     if (outcome == RestartOutcome.startError) throw PlatformException(code: 'synthetic_start_failure');

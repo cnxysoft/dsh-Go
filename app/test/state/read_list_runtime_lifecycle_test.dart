@@ -34,6 +34,7 @@ class _Bridge extends RuntimeBridge {
     bool phoneStorage = false,
     EngineMode? mode,
     bool visualReplies = true,
+    bool managedAgentsMd = true,
   }) async => calls.add('start');
   @override
   Future<void> install({bool dropKept = false}) async => calls.add('install');

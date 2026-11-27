@@ -10698,6 +10698,12 @@ class L10nZh extends L10n {
   String get hubSettingsVisualRepliesHint => '图表、对比卡和可点的选项';
 
   @override
+  String get hubSettingsManagedAgentsMd => '注入 DSH Go 环境说明';
+
+  @override
+  String get hubSettingsManagedAgentsMdHint => '启动时写入托管 AGENTS.md；关闭保持上下文纯净，不触碰自定义文件';
+
+  @override
   String get hubSettingsPhoneControl => '手机操控';
 
   @override
@@ -19166,6 +19172,9 @@ class L10nZh extends L10n {
 
   @override
   String get searchKwVisualReplies => '图表,卡片,可视化,选项';
+
+  @override
+  String get searchKwManagedAgentsMd => 'AGENTS.md,提示词,环境说明,注入,人格,上下文';
 
   @override
   String get searchKwTextSize => '字号,字体,文字大小,大字,字体大小';

@@ -19842,6 +19842,18 @@ abstract class L10n {
   /// **'图表、对比卡和可点的选项'**
   String get hubSettingsVisualRepliesHint;
 
+  /// No description provided for @hubSettingsManagedAgentsMd.
+  ///
+  /// In zh, this message translates to:
+  /// **'注入 DSH Go 环境说明'**
+  String get hubSettingsManagedAgentsMd;
+
+  /// No description provided for @hubSettingsManagedAgentsMdHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时写入托管 AGENTS.md；关闭保持上下文纯净，不触碰自定义文件'**
+  String get hubSettingsManagedAgentsMdHint;
+
   /// No description provided for @hubSettingsPhoneControl.
   ///
   /// In zh, this message translates to:
@@ -35237,6 +35249,12 @@ abstract class L10n {
   /// In zh, this message translates to:
   /// **'图表,卡片,可视化,选项'**
   String get searchKwVisualReplies;
+
+  /// No description provided for @searchKwManagedAgentsMd.
+  ///
+  /// In zh, this message translates to:
+  /// **'AGENTS.md,提示词,环境说明,注入,人格,上下文'**
+  String get searchKwManagedAgentsMd;
 
   /// No description provided for @searchKwTextSize.
   ///

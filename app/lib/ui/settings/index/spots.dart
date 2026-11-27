@@ -776,6 +776,13 @@ abstract final class Spots {
     keywords: (l) => l.searchKwVisualReplies,
     condition: SpotCondition.localHost,
   );
+  static final managedAgentsMd = SettingSpot(
+    'managed-agents-md',
+    page: SettingsPageId.personalization,
+    title: (l) => l.hubSettingsManagedAgentsMd,
+    keywords: (l) => l.searchKwManagedAgentsMd,
+    condition: SpotCondition.localHost,
+  );
 
   // 手机操控.
   static final phoneA11yRestore = SettingSpot(
@@ -1268,6 +1275,7 @@ final _rows = <SettingSpot>[
   Spots.phoneFiles,
   Spots.permissionPhoneConfirm,
   Spots.visualReplies,
+  Spots.managedAgentsMd,
   Spots.phoneA11yRestore,
   Spots.phoneConfirm,
   Spots.phoneAutoCollapse,

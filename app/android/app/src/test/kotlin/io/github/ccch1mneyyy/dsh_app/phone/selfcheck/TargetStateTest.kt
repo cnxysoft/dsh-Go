@@ -276,4 +276,17 @@ class TargetStateTest {
         assertFalse(state.facts().closed)
     }
 
+    @Test fun removedTaskAfterTeardownBarrierCompletesClose() {
+        val state = started()
+        val activity = Any()
+        assertTrue(state.register(activity, 7, 12))
+        state.seal()
+        assertFalse(state.observeTaskRemoved(state.taskReadStamp()))
+        state.destroyed(activity, finishing = true, changingConfiguration = false)
+        assertFalse(state.observeTaskRemoved(state.taskReadStamp()))
+        state.teardownCompleted(activity)
+        assertTrue(state.observeTaskRemoved(state.taskReadStamp()))
+        assertTrue(state.finishIfClosed())
+        assertTrue(state.facts().closed)
+    }
 }

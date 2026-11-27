@@ -233,8 +233,14 @@ class PrivilegedDisplayCore internal constructor(
         } catch (e: Throwable) {
             if (op == Proto.OP_REPLAY_NAVIGATION) response.getBundle(Proto.NAVIGATION)?.putString("post", "unknown")
             if (response.containsKey(Proto.COORDINATE_SCOPE_VERSION)) response.putBoolean(Proto.COORDINATE_SCOPE_KNOWN, false)
+            val code = failureCode(e)
+            if (code == "deviceUnavailable") {
+                runCatching {
+                    android.util.Log.w("DshPrivDisplay", "op=$op failed: ${e.javaClass.name} at ${e.stackTrace.firstOrNull()}")
+                }
+            }
             response.putBoolean(Proto.OK, false)
-            response.putString(Proto.ERROR, failureCode(e))
+            response.putString(Proto.ERROR, code)
             (e as? Fault)?.shown?.let { response.putString(Proto.FG_PKG, it) }
             val detail = if (targetReply) null else if (selfCheckReply) (e as? InputProbe.Failure)?.observation?.encode() else failureDetail(e)
             detail?.let { response.putString(Proto.ERROR_DETAIL, it) }

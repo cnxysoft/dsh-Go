@@ -11321,6 +11321,13 @@ class L10nEn extends L10n {
   String get hubSettingsVisualRepliesHint => 'Charts, comparisons and tappable options';
 
   @override
+  String get hubSettingsManagedAgentsMd => 'Inject DSH Go environment notes';
+
+  @override
+  String get hubSettingsManagedAgentsMdHint =>
+      'Write managed AGENTS.md on launch; turn off for a clean prompt without touching custom files';
+
+  @override
   String get hubSettingsPhoneControl => 'Phone control';
 
   @override
@@ -20227,6 +20234,9 @@ class L10nEn extends L10n {
 
   @override
   String get searchKwVisualReplies => 'charts,cards,visual,options';
+
+  @override
+  String get searchKwManagedAgentsMd => 'AGENTS.md,prompt,environment,inject,persona,context';
 
   @override
   String get searchKwTextSize => 'font,font size,text size,larger text';

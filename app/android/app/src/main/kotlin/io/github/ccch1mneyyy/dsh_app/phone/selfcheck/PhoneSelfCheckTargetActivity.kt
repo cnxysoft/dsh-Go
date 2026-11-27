@@ -270,27 +270,44 @@ internal object PhoneSelfCheckTarget {
     /** Absence and Binder exceptions are not proof that a queued launch never happened. */
     private fun inspectTask(ticket: Ticket) {
         val app = ticket.app ?: return
+        val readStamp = ticket.state.taskReadStamp()
         try {
-            val candidates = ticket.appTask?.let { listOf(it) }
-                ?: app.getSystemService(ActivityManager::class.java).appTasks
+            val am = app.getSystemService(ActivityManager::class.java)
+            val cached = ticket.appTask
+            val candidates = cached?.let { listOf(it) } ?: am.appTasks
+            var matched = false
             for (task in candidates) {
-                val readStamp = ticket.state.taskReadStamp()
-                val info = task.taskInfo
+                val info = try {
+                    task.taskInfo
+                } catch (_: RuntimeException) {
+                    if (task === cached) ticket.appTask = null
+                    continue
+                }
                 if (info.baseIntent.component?.packageName != app.packageName) continue
-                // TaskInfo.displayId is hidden on the Android versions supported by this probe.
-                // Preserve the actual display fact; an unreadable field must not acknowledge cleanup.
-                val displayId = info.javaClass.getField("displayId").getInt(info)
+                // TaskInfo.displayId is hidden on newer Android versions; fall back to unknown (-1)
+                // rather than blocking cleanup when reflection is denied (onCreate already recorded displayId).
+                val displayId = runCatching { info.javaClass.getField("displayId").getInt(info) }.getOrDefault(-1)
                 if (ticket.state.observeTask(readStamp, info.taskId, info.baseIntent.component?.className,
                         info.baseIntent.identifier, displayId, info.isRunning,
                         info.numActivities, info.topActivity == null)) {
                     ticket.appTask = task
-                    return
+                    matched = true
+                    break
                 }
             }
-        } catch (_: ReflectiveOperationException) {
-            // Missing or blocked hidden API evidence leaves this original ticket pending.
+            if (!matched && readStamp != null && ticket.state.hasCreated()) {
+                val stillPresent = am.appTasks.any { task ->
+                    runCatching {
+                        val info = task.taskInfo
+                        info.baseIntent.component?.packageName == app.packageName &&
+                            info.baseIntent.component?.className == TargetContract.ACTIVITY_CLASS &&
+                            info.baseIntent.identifier == TargetContract.identifier(ticket.state.targetRun)
+                    }.getOrDefault(false)
+                }
+                if (!stillPresent) ticket.state.observeTaskRemoved(readStamp)
+            }
         } catch (_: RuntimeException) {
-            // Retain the ticket and retry. In particular, a removed AppTask can throw here.
+            // Retain the ticket and retry on transient Binder errors.
         }
     }
 

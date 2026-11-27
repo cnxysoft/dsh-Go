@@ -26,6 +26,7 @@ class AppSettings {
     this.chatTextScale = 1.0,
     this.foldCompletedTurns = true,
     this.visualReplies = true,
+    this.managedAgentsMd = true,
     this.customProviderIds = const {},
     this.loaded = false,
   });
@@ -72,6 +73,10 @@ class AppSettings {
   /// Off only drops the instructions; views that arrive are still drawn.
   final bool visualReplies;
 
+  /// Write the app-managed $DSH_HOME/AGENTS.md before engine start. Off skips
+  /// writing and removes an existing managed file without touching custom ones.
+  final bool managedAgentsMd;
+
   /// Custom providers created on the local engine whose key is kept on the
   /// phone ([ProviderKeyVault]). Known at launch, before the engine runs, so
   /// the first-run gate can tell "has a model to talk to" without it.
@@ -97,6 +102,7 @@ class AppSettings {
     double? chatTextScale,
     bool? foldCompletedTurns,
     bool? visualReplies,
+    bool? managedAgentsMd,
     Set<String>? customProviderIds,
     bool? loaded,
   }) => AppSettings(
@@ -113,6 +119,7 @@ class AppSettings {
     chatTextScale: chatTextScale ?? this.chatTextScale,
     foldCompletedTurns: foldCompletedTurns ?? this.foldCompletedTurns,
     visualReplies: visualReplies ?? this.visualReplies,
+    managedAgentsMd: managedAgentsMd ?? this.managedAgentsMd,
     customProviderIds: customProviderIds ?? this.customProviderIds,
     loaded: loaded ?? this.loaded,
   );
@@ -139,6 +146,7 @@ class SettingsController extends Notifier<AppSettings> {
   static const _chatTextScaleKey = 'chat_text_scale';
   static const _foldTurnsKey = 'fold_completed_turns';
   static const _visualRepliesKey = 'visual_replies';
+  static const _managedAgentsMdKey = 'managed_agents_md';
   static const _secure = AppSecureStorage();
   late Future<void> _loaded;
 
@@ -187,6 +195,7 @@ class SettingsController extends Notifier<AppSettings> {
       chatTextScale: _knownScale(prefs.getDouble(_chatTextScaleKey)),
       foldCompletedTurns: prefs.getBool(_foldTurnsKey) ?? true,
       visualReplies: prefs.getBool(_visualRepliesKey) ?? true,
+      managedAgentsMd: prefs.getBool(_managedAgentsMdKey) ?? true,
       customProviderIds: providerIds,
       loaded: true,
     );
@@ -291,6 +300,14 @@ class SettingsController extends Notifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_visualRepliesKey, value);
     state = state.copyWith(visualReplies: value);
+  }
+
+  /// Takes effect at the next engine start: off stops writing the managed
+  /// AGENTS.md and removes an existing managed copy while preserving user files.
+  Future<void> setManagedAgentsMd(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_managedAgentsMdKey, value);
+    state = state.copyWith(managedAgentsMd: value);
   }
 
   Future<void> setWebPhoneLayout(bool value) async {

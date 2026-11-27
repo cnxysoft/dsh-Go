@@ -246,4 +246,25 @@ class GuestAgentsModeTest {
             assertEquals(modified, file.lastModified())
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun disablingManagedAgentsMdRemovesManagedFileAndLeavesUserFileUntouched() {
+        val root = kotlin.io.path.createTempDirectory("agents-disabled").toFile()
+        try {
+            val file = File(root, "root/.dsh/AGENTS.md")
+            GuestSetup.writeAgentsMd(root, phoneStorage = true, managedAgentsMd = false)
+            assertFalse(file.exists())
+
+            GuestSetup.writeAgentsMd(root, phoneStorage = true, managedAgentsMd = true)
+            assertTrue(file.isFile)
+            GuestSetup.writeAgentsMd(root, phoneStorage = true, managedAgentsMd = false)
+            assertFalse(file.exists())
+
+            file.parentFile!!.mkdirs()
+            val custom = "# My own persona\nKeep exact wording.\n".toByteArray()
+            file.writeBytes(custom)
+            GuestSetup.writeAgentsMd(root, phoneStorage = true, managedAgentsMd = false)
+            assertTrue(file.isFile)
+            assertArrayEquals(custom, file.readBytes())
+        } finally { root.deleteRecursively() }
+    }
 }
