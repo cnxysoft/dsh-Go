@@ -627,8 +627,10 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 noteDns(GuestSetup.writeResolvConf(app, installer.rootfs), DnsConfigSource.START)
                 val storage = pendingPhoneStorage && PhoneStorage.isGranted(app) && PhoneStorage.binds().isNotEmpty()
                 PhoneStorage.syncShortcut(installer.rootfs, storage)
+                val chroot = chrootEngine()
+                val allowRootPeer = !safe && chroot.enabled
                 // Phone control: bridge up and guest files written before DSH starts; off in safe mode.
-                val phone = PhoneControl.get(app).prepareLaunch(installer.rootfs, safe) { log(it, "system") }
+                val phone = PhoneControl.get(app).prepareLaunch(installer.rootfs, safe, allowRootPeer = allowRootPeer) { log(it, "system") }
                 val searchOverlay = !safe && SessionSearchGuest.writeFiles(installer.rootfs)
                 if (!safe && !searchOverlay) {
                     log("[dsh-app] message search overlay not written; searching matches titles only", "system")
@@ -662,7 +664,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 // Only the installed native endpoint may advertise SIWC for this launch.
                 env.remove(SiwcStoreBridge.ENV)
                 val launchStore = if (authOverlay && AppAuthGuest.writeSiwcFiles(app, installer.rootfs)) {
-                    try { SiwcStoreBridge.start(app) } catch (_: Exception) { null }
+                    try { SiwcStoreBridge.start(app, allowRootPeer = allowRootPeer) } catch (_: Exception) { null }
                 } else null
                 siwcStore = launchStore
                 if (launchStore != null) env[SiwcStoreBridge.ENV] = launchStore.endpoint
@@ -705,7 +707,6 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 timeline.spawned()
                 val direct = directEngine()
                 val tawc = tawcEngine()
-                val chroot = chrootEngine()
                 val hostMounts = if (safe) emptyList() else HostMounts.prepareBinds(installer.rootfs, HostMounts.read(app)) {
                     log(it, "system")
                 }

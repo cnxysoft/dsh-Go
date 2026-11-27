@@ -457,7 +457,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
      * Before a normal DSH launch, mounts the bridge even with control off: diagnostics is independent.
      * Other tools still require the control switch. Safe mode mounts no phone tools.
      */
-    fun prepareLaunch(rootfs: File, safe: Boolean, log: (String) -> Unit): Boolean {
+    fun prepareLaunch(rootfs: File, safe: Boolean, allowRootPeer: Boolean = false, log: (String) -> Unit): Boolean {
         logger = log
         tasks.invalidateOwners()
         retireSkills()
@@ -473,7 +473,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         return try {
             PhoneGuest.writeFiles(rootfs, app.assets.open("phone/skills.mjs").bufferedReader().use { it.readText() })
             tasks.clearStop()
-            val ep = bridge.start(withTcp = prefs.getBoolean(K_TCP_FALLBACK, false))
+            val ep = bridge.start(withTcp = prefs.getBoolean(K_TCP_FALLBACK, false), allowRootPeer = allowRootPeer)
             PhoneGuest.writeConfig(rootfs, ep)
             refreshScreenOff()
             emitStatus()

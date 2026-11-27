@@ -25,11 +25,12 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.concurrent.thread
 
-/** One request per connection, same UID only, with no TCP fallback. See siwc/store.mjs. */
+/** One request per connection, same UID (plus uid 0 when Root chroot is active), no TCP fallback. See siwc/store.mjs. */
 internal class SiwcStoreBridge private constructor(
     private val directory: File,
     private val address: String,
     private val secret: ByteArray,
+    private val allowRootPeer: Boolean = false,
 ) : AutoCloseable {
     private val server = LocalServerSocket(address)
     @Volatile private var closed = false
@@ -86,7 +87,8 @@ internal class SiwcStoreBridge private constructor(
     }
 
     private fun handle(socket: LocalSocket) {
-        if (socket.peerCredentials.uid != Process.myUid()) return
+        val peerUid = socket.peerCredentials.uid
+        if (peerUid != Process.myUid() && !(allowRootPeer && peerUid == 0)) return
         socket.soTimeout = 2_000
         val input = DataInputStream(socket.inputStream)
         val output = socket.outputStream
@@ -128,10 +130,10 @@ internal class SiwcStoreBridge private constructor(
     companion object {
         const val ENV = "DSH_APP_SIWC_SOCKET_SECRET"
 
-        fun start(context: Context): SiwcStoreBridge {
+        fun start(context: Context, allowRootPeer: Boolean = false): SiwcStoreBridge {
             val address = "dsh-app.siwc." + UUID.randomUUID()
             val secret = ByteArray(32).also(SecureRandom()::nextBytes)
-            return SiwcStoreBridge(context.noBackupFilesDir, address, secret).also { bridge ->
+            return SiwcStoreBridge(context.noBackupFilesDir, address, secret, allowRootPeer).also { bridge ->
                 try {
                     thread(name = "dsh-siwc-store", isDaemon = true) { bridge.serve() }
                 } catch (error: Exception) {

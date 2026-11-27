@@ -48,6 +48,7 @@ class PhoneBridge(
 ) {
     class EndWork(val reply: String, val finish: () -> Unit)
     @Volatile private var running = false
+    @Volatile private var allowRootPeer = false
     private var local: LocalServerSocket? = null
     private var tcp: ServerSocket? = null
     private val open = Collections.synchronizedSet(HashSet<Closeable>())
@@ -64,8 +65,9 @@ class PhoneBridge(
 
     /** Binds a fresh abstract socket (and TCP when [withTcp]); returns what the relay needs. */
     @Synchronized
-    fun start(withTcp: Boolean): PhoneGuest.Endpoint {
+    fun start(withTcp: Boolean, allowRootPeer: Boolean = false): PhoneGuest.Endpoint {
         stop()
+        this.allowRootPeer = allowRootPeer
         val token = hex(32)
         var name: String? = null
         var lastError: Exception? = null
@@ -113,6 +115,7 @@ class PhoneBridge(
     fun stop() {
         if (!running && local == null && tcp == null) return
         running = false
+        allowRootPeer = false
         endpoint = null
         local?.let { s ->
             // close() alone doesn't wake accept() on every Android version: shut the fd down first.
@@ -129,6 +132,8 @@ class PhoneBridge(
     }
 
     private fun current(token: String): Boolean = running && endpoint?.token == token
+
+    private fun isAllowedPeerUid(uid: Int): Boolean = uid == Process.myUid() || (allowRootPeer && uid == 0)
 
     private fun acceptLocal(s: LocalServerSocket, token: String) {
         while (current(token)) {
@@ -147,7 +152,7 @@ class PhoneBridge(
             } catch (_: Exception) {
                 -1
             }
-            if (uid != Process.myUid()) {
+            if (!isAllowedPeerUid(uid)) {
                 log("[dsh-app] phone bridge: refused a connection from uid $uid")
                 runCatching { sock.close() }
                 continue
@@ -169,7 +174,7 @@ class PhoneBridge(
                 return
             }
             val uid = loopbackPeerUid(sock.port, s.localPort)
-            if (uid != null && uid != Process.myUid()) {
+            if (uid != null && !isAllowedPeerUid(uid)) {
                 log("[dsh-app] phone bridge: refused a tcp connection from uid $uid")
                 runCatching { sock.close() }
                 continue
