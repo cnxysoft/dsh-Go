@@ -3668,6 +3668,84 @@ abstract class L10n {
   /// **'开启全局免确认'**
   String get androidShellApprovalAlwaysRiskAction;
 
+  /// No description provided for @androidShellExecutionSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行限制与锁屏'**
+  String get androidShellExecutionSection;
+
+  /// No description provided for @androidShellAllowWhenLocked.
+  ///
+  /// In zh, this message translates to:
+  /// **'息屏 / 锁屏时允许执行'**
+  String get androidShellAllowWhenLocked;
+
+  /// No description provided for @androidShellAllowWhenLockedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭屏幕或锁屏后继续执行 Android Shell，适合息屏跑长任务；需搭配免确认或本轮已授权，否则无法弹窗确认。不影响屏幕操控的锁屏限制。'**
+  String get androidShellAllowWhenLockedHint;
+
+  /// No description provided for @androidShellAllowWhenLockedRiskTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许息屏 / 锁屏时执行命令？'**
+  String get androidShellAllowWhenLockedRiskTitle;
+
+  /// No description provided for @androidShellAllowWhenLockedRiskBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后，关闭屏幕或锁屏时不会中断或拒绝 Android Shell（含 Root）命令，方便息屏让模型继续执行任务。请确保当前确认模式符合你的预期；随时可在本页关闭。'**
+  String get androidShellAllowWhenLockedRiskBody;
+
+  /// No description provided for @androidShellAllowWhenLockedRiskAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许息屏执行'**
+  String get androidShellAllowWhenLockedRiskAction;
+
+  /// No description provided for @androidShellMaxCommandTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'命令长度上限'**
+  String get androidShellMaxCommandTitle;
+
+  /// No description provided for @androidShellMaxTimeoutTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'单次最长超时'**
+  String get androidShellMaxTimeoutTitle;
+
+  /// No description provided for @androidShellMaxOutputTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'输出体积上限'**
+  String get androidShellMaxOutputTitle;
+
+  /// No description provided for @androidShellMaxOutputShizukuHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Shizuku 受 Android Binder 事务大小限制，实际单次输出上限为 256 KB；直连 Root 与自连 ADB 可完整使用 512 KB。'**
+  String get androidShellMaxOutputShizukuHint;
+
+  /// No description provided for @androidShellLimitKb.
+  ///
+  /// In zh, this message translates to:
+  /// **'{kb} KB'**
+  String androidShellLimitKb(int kb);
+
+  /// No description provided for @androidShellLimitSeconds.
+  ///
+  /// In zh, this message translates to:
+  /// **'{seconds} 秒'**
+  String androidShellLimitSeconds(int seconds);
+
+  /// No description provided for @androidShellLimitMinutes.
+  ///
+  /// In zh, this message translates to:
+  /// **'{minutes} 分钟'**
+  String androidShellLimitMinutes(int minutes);
+
   /// No description provided for @androidBackgroundProtectionTitle.
   ///
   /// In zh, this message translates to:

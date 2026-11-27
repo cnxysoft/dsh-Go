@@ -1116,6 +1116,40 @@
   "androidShellApprovalAlwaysRiskTitle": "开启全局免确认执行？",
   "androidShellApprovalAlwaysRiskBody": "开启后该设置会持久保存，Android Shell（含 Root UID 0）命令将始终直接执行而不再弹窗，适合无人值守长任务。切通道或关闭手机操控会自动复位，你也可随时在本页一键切回逐条确认。",
   "androidShellApprovalAlwaysRiskAction": "开启全局免确认",
+  "androidShellExecutionSection": "运行限制与锁屏",
+  "androidShellAllowWhenLocked": "息屏 / 锁屏时允许执行",
+  "androidShellAllowWhenLockedHint": "关闭屏幕或锁屏后继续执行 Android Shell，适合息屏跑长任务；需搭配免确认或本轮已授权，否则无法弹窗确认。不影响屏幕操控的锁屏限制。",
+  "androidShellAllowWhenLockedRiskTitle": "允许息屏 / 锁屏时执行命令？",
+  "androidShellAllowWhenLockedRiskBody": "开启后，关闭屏幕或锁屏时不会中断或拒绝 Android Shell（含 Root）命令，方便息屏让模型继续执行任务。请确保当前确认模式符合你的预期；随时可在本页关闭。",
+  "androidShellAllowWhenLockedRiskAction": "允许息屏执行",
+  "androidShellMaxCommandTitle": "命令长度上限",
+  "androidShellMaxTimeoutTitle": "单次最长超时",
+  "androidShellMaxOutputTitle": "输出体积上限",
+  "androidShellMaxOutputShizukuHint": "Shizuku 受 Android Binder 事务大小限制，实际单次输出上限为 256 KB；直连 Root 与自连 ADB 可完整使用 512 KB。",
+  "androidShellLimitKb": "{kb} KB",
+  "@androidShellLimitKb": {
+    "placeholders": {
+      "kb": {
+        "type": "int"
+      }
+    }
+  },
+  "androidShellLimitSeconds": "{seconds} 秒",
+  "@androidShellLimitSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "androidShellLimitMinutes": "{minutes} 分钟",
+  "@androidShellLimitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "androidBackgroundProtectionTitle": "增强保活",
   "androidBackgroundProtectionAudioHint": "有本机任务时在后台播放静音音频，可能增加耗电。",
   "androidBackgroundProtectionLocationHint": "使用粗略位置，可能增加耗电；不保存或发送坐标。关闭后停止定位，但不撤回系统权限。",

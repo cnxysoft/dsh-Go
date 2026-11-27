@@ -68,6 +68,7 @@ class AndroidShellStatus {
     this.ready = false,
     this.uid,
     this.reasonCode,
+    this.allowWhenLocked = false,
     this.approvalMode = AndroidShellApprovalMode.every,
     this.approvalExpiresInMs,
     this.approvalUntilRestart = false,
@@ -104,6 +105,7 @@ class AndroidShellStatus {
       ready: value['ready'] == true,
       uid: uid,
       reasonCode: _code(value['reasonCode']),
+      allowWhenLocked: value['allowWhenLocked'] == true,
       approvalMode: approvalMode,
       approvalExpiresInMs: approvalExpiresInMs,
       approvalUntilRestart: approvalUntilRestart,
@@ -123,6 +125,7 @@ class AndroidShellStatus {
   final bool ready;
   final int? uid;
   final String? reasonCode;
+  final bool allowWhenLocked;
   final AndroidShellApprovalMode approvalMode;
   final int? approvalExpiresInMs;
   final bool approvalUntilRestart;
@@ -150,6 +153,9 @@ class AndroidShellChannel {
   const AndroidShellChannel();
 
   static const _channel = MethodChannel('dsh/phone');
+  static const commandByteOptions = [2048, 8192, 32768, 65536];
+  static const maxTimeoutMsOptions = [60000, 120000, 300000, 600000];
+  static const maxOutputByteOptions = [65536, 131072, 262144, 524288];
 
   Future<bool> recordLocalComposerPrompt(String sessionId, String requestId) async {
     try {
@@ -191,6 +197,32 @@ class AndroidShellChannel {
       return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
     }
     return _result('androidShellSetApproval', {'mode': mode.name, 'durationMs': ?durationMs});
+  }
+
+  Future<AndroidShellResult> setLimits({
+    int? maxCommandBytes,
+    int? maxTimeoutMs,
+    int? maxOutputBytes,
+    bool? allowWhenLocked,
+  }) {
+    if (maxCommandBytes == null && maxTimeoutMs == null && maxOutputBytes == null && allowWhenLocked == null) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    if (maxCommandBytes != null && !commandByteOptions.contains(maxCommandBytes)) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    if (maxTimeoutMs != null && !maxTimeoutMsOptions.contains(maxTimeoutMs)) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    if (maxOutputBytes != null && !maxOutputByteOptions.contains(maxOutputBytes)) {
+      return Future.value(const AndroidShellResult(false, errorCode: 'invalidArguments'));
+    }
+    return _result('androidShellSetLimits', {
+      'maxCommandBytes': ?maxCommandBytes,
+      'maxTimeoutMs': ?maxTimeoutMs,
+      'maxOutputBytes': ?maxOutputBytes,
+      'allowWhenLocked': ?allowWhenLocked,
+    });
   }
 
   Future<bool> requestPermission() => _bool('androidShellRequestPermission');

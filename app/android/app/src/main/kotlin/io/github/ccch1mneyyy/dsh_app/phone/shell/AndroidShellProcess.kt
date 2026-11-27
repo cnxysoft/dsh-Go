@@ -90,7 +90,8 @@ object AndroidShellJobMain {
     fun main(args: Array<String>) {
         if (args.size != 2) exitProcess(125)
         val timeout = args[0].toLongOrNull() ?: exitProcess(125)
-        if (ShellProtocol.timeoutError(timeout) != null || ShellProtocol.commandError(args[1]) != null) exitProcess(125)
+        if (ShellProtocol.timeoutError(timeout, ShellProtocol.HARD_MAX_TIMEOUT_MS) != null ||
+            ShellProtocol.commandError(args[1], ShellProtocol.HARD_MAX_COMMAND_BYTES) != null) exitProcess(125)
         val pid = Process.myPid()
         Os.setsid()
         val output = FileOutputStream(FileDescriptor.out)

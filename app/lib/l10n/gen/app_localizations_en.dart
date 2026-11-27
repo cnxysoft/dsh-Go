@@ -2046,6 +2046,54 @@ class L10nEn extends L10n {
   String get androidShellApprovalAlwaysRiskAction => 'Enable always auto-approve';
 
   @override
+  String get androidShellExecutionSection => 'Limits & lock screen';
+
+  @override
+  String get androidShellAllowWhenLocked => 'Allow while screen is off or locked';
+
+  @override
+  String get androidShellAllowWhenLockedHint =>
+      'Keep running Android Shell while the screen is off or locked for unattended tasks. Requires auto-approve or an active turn grant because prompts cannot appear while locked. Screen-control lock protection stays unchanged.';
+
+  @override
+  String get androidShellAllowWhenLockedRiskTitle => 'Allow commands while locked?';
+
+  @override
+  String get androidShellAllowWhenLockedRiskBody =>
+      'When enabled, turning off or locking the screen will not interrupt or reject Android Shell (including Root) commands, allowing unattended background tasks. Make sure your confirmation mode matches what you expect; you can turn this off here anytime.';
+
+  @override
+  String get androidShellAllowWhenLockedRiskAction => 'Allow while locked';
+
+  @override
+  String get androidShellMaxCommandTitle => 'Max command length';
+
+  @override
+  String get androidShellMaxTimeoutTitle => 'Max command timeout';
+
+  @override
+  String get androidShellMaxOutputTitle => 'Max output size';
+
+  @override
+  String get androidShellMaxOutputShizukuHint =>
+      'Shizuku is capped at 256 KB by Android Binder transaction limits; direct Root and self-ADB support the full 512 KB.';
+
+  @override
+  String androidShellLimitKb(int kb) {
+    return '$kb KB';
+  }
+
+  @override
+  String androidShellLimitSeconds(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String androidShellLimitMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
   String get androidBackgroundProtectionTitle => 'Enhanced background protection';
 
   @override

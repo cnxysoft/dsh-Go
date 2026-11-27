@@ -134,5 +134,39 @@
   "androidShellApprovalTempRiskAction": "Enable temporary auto-approve",
   "androidShellApprovalAlwaysRiskTitle": "Enable persistent auto-approve?",
   "androidShellApprovalAlwaysRiskBody": "This setting persists across restarts and runs Android Shell commands (including Root UID 0) without prompting for unattended tasks. Switching backends or disabling Phone control resets it, and you can switch back here anytime.",
-  "androidShellApprovalAlwaysRiskAction": "Enable always auto-approve"
+  "androidShellApprovalAlwaysRiskAction": "Enable always auto-approve",
+  "androidShellExecutionSection": "Limits & lock screen",
+  "androidShellAllowWhenLocked": "Allow while screen is off or locked",
+  "androidShellAllowWhenLockedHint": "Keep running Android Shell while the screen is off or locked for unattended tasks. Requires auto-approve or an active turn grant because prompts cannot appear while locked. Screen-control lock protection stays unchanged.",
+  "androidShellAllowWhenLockedRiskTitle": "Allow commands while locked?",
+  "androidShellAllowWhenLockedRiskBody": "When enabled, turning off or locking the screen will not interrupt or reject Android Shell (including Root) commands, allowing unattended background tasks. Make sure your confirmation mode matches what you expect; you can turn this off here anytime.",
+  "androidShellAllowWhenLockedRiskAction": "Allow while locked",
+  "androidShellMaxCommandTitle": "Max command length",
+  "androidShellMaxTimeoutTitle": "Max command timeout",
+  "androidShellMaxOutputTitle": "Max output size",
+  "androidShellMaxOutputShizukuHint": "Shizuku is capped at 256 KB by Android Binder transaction limits; direct Root and self-ADB support the full 512 KB.",
+  "androidShellLimitKb": "{kb} KB",
+  "@androidShellLimitKb": {
+    "placeholders": {
+      "kb": {
+        "type": "int"
+      }
+    }
+  },
+  "androidShellLimitSeconds": "{seconds} s",
+  "@androidShellLimitSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "androidShellLimitMinutes": "{minutes} min",
+  "@androidShellLimitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -122,6 +122,41 @@ void main() {
     expect(find.text(appL10n.androidShellConfirmationNote), findsOneWidget);
   });
 
+  testWidgets('limits pickers and allow-when-locked switch update native settings safely', (tester) async {
+    final fake = await _pump(
+      tester,
+      native: ShellNative(status: shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null)),
+    );
+    const lockKey = ValueKey('android-shell-allow-when-locked');
+    expect(tester.widget<Switch>(find.byKey(lockKey)).value, isFalse);
+    await _tap(tester, lockKey.value);
+    expect(find.text(appL10n.androidShellAllowWhenLockedRiskTitle), findsOneWidget);
+    expect(fake.callsOf('androidShellSetLimits'), isEmpty);
+    await _tap(tester, 'risk-confirm');
+    expect(fake.callsOf('androidShellSetLimits').single.arguments, {'allowWhenLocked': true});
+    expect(tester.widget<Switch>(find.byKey(lockKey)).value, isTrue);
+
+    await _tap(tester, lockKey.value); // Turning off never requires a risk sheet.
+    expect(find.byType(RiskNoticeSheet), findsNothing);
+    expect(fake.callsOf('androidShellSetLimits').last.arguments, {'allowWhenLocked': false});
+    expect(tester.widget<Switch>(find.byKey(lockKey)).value, isFalse);
+
+    await _tap(tester, 'android-shell-max-command');
+    await _tap(tester, 'android-shell-limit-opt-32768');
+    expect(fake.callsOf('androidShellSetLimits').last.arguments, {'maxCommandBytes': 32768});
+    expect(find.text(appL10n.androidShellLimitKb(32)), findsOneWidget);
+
+    await _tap(tester, 'android-shell-max-timeout');
+    await _tap(tester, 'android-shell-limit-opt-300000');
+    expect(fake.callsOf('androidShellSetLimits').last.arguments, {'maxTimeoutMs': 300000});
+    expect(find.text(appL10n.androidShellLimitMinutes(5)), findsOneWidget);
+
+    await _tap(tester, 'android-shell-max-output');
+    await _tap(tester, 'android-shell-limit-opt-524288');
+    expect(fake.callsOf('androidShellSetLimits').last.arguments, {'maxOutputBytes': 524288});
+    expect(find.text(appL10n.androidShellLimitKb(512)), findsOneWidget);
+  });
+
   testWidgets('default page keeps technical details collapsed on a phone screen', (tester) async {
     final native = await _pump(
       tester,

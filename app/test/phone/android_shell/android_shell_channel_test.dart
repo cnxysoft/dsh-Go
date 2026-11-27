@@ -110,7 +110,32 @@ void main() {
     }
     expect((await channel.setApproval(AndroidShellApprovalMode.always, durationMs: 600000)).errorCode, 'invalidArguments');
     expect((await channel.setApproval(AndroidShellApprovalMode.temporary, durationMs: 1000)).errorCode, 'invalidArguments');
+    expect((await channel.setLimits()).errorCode, 'invalidArguments');
+    expect((await channel.setLimits(maxCommandBytes: 4096)).errorCode, 'invalidArguments');
+    expect((await channel.setLimits(maxTimeoutMs: 90000)).errorCode, 'invalidArguments');
+    expect((await channel.setLimits(maxOutputBytes: 99999)).errorCode, 'invalidArguments');
     expect(native.calls, isEmpty);
+  });
+
+  test('limits and allowWhenLocked parse safely and send exact contract', () async {
+    final native = ShellNative(
+      status: {
+        ...shellStatus(enabled: true, backend: 'root', ready: true, uid: 0, reasonCode: null),
+        'allowWhenLocked': true,
+      },
+    )..install();
+    final status = await channel.status();
+    expect(status.allowWhenLocked, isTrue);
+    expect((await channel.setLimits(maxCommandBytes: 8192)).ok, isTrue);
+    expect((await channel.setLimits(maxTimeoutMs: 300000)).ok, isTrue);
+    expect((await channel.setLimits(maxOutputBytes: 262144)).ok, isTrue);
+    expect((await channel.setLimits(allowWhenLocked: false)).ok, isTrue);
+    expect(native.callsOf('androidShellSetLimits').map((c) => c.arguments).toList(), [
+      {'maxCommandBytes': 8192},
+      {'maxTimeoutMs': 300000},
+      {'maxOutputBytes': 262144},
+      {'allowWhenLocked': false},
+    ]);
   });
 
   test('approval status fields parse safely and setApproval sends exact contract', () async {

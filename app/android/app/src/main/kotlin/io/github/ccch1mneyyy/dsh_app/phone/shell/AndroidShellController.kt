@@ -17,6 +17,13 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     private var enabled = preferences.getBoolean("enabled", false)
     private var backend = preferences.getString("backend", "shizuku").takeIf { it in ShellProtocol.backends } ?: "shizuku"
     private var restorePending = preferences.getBoolean("restoreOnOpen", false)
+    private var maxCommandBytes = preferences.getInt("maxCommandBytes", ShellProtocol.MAX_COMMAND_BYTES)
+        .takeIf { it in ShellProtocol.commandByteOptions } ?: ShellProtocol.MAX_COMMAND_BYTES
+    private var maxTimeoutMs = preferences.getLong("maxTimeoutMs", ShellProtocol.MAX_TIMEOUT_MS)
+        .takeIf { it in ShellProtocol.maxTimeoutMsOptions } ?: ShellProtocol.MAX_TIMEOUT_MS
+    private var maxOutputBytes = preferences.getInt("maxOutputBytes", ShellProtocol.MAX_OUTPUT_BYTES)
+        .takeIf { it in ShellProtocol.maxOutputByteOptions } ?: ShellProtocol.MAX_OUTPUT_BYTES
+    private var allowWhenLocked = preferences.getBoolean("allowWhenLocked", false)
     private val approval = ShellApprovalState(
         ShellApprovalMode.parsePersisted(preferences.getString("approvalMode", null)),
         SystemClock::elapsedRealtime,
@@ -38,7 +45,12 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
     }
 
     fun status(): Map<String, Any?> {
-        val config = synchronized(guard) { enabled to backend }
+        val snapshot = synchronized(guard) {
+            Triple(enabled to backend, allowWhenLocked, ShellLimits(ShellProtocol.DEFAULT_TIMEOUT_MS, maxTimeoutMs, maxOutputBytes, maxCommandBytes))
+        }
+        val config = snapshot.first
+        val lockedAllowed = snapshot.second
+        val currentLimits = snapshot.third
         val shizukuStatus = shizuku.status()
         val adbStatus = adb.status()
         val link = readyLink?.takeIf { it.backend == config.second && it.alive() &&
@@ -57,11 +69,45 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         return mapOf(
             "v" to 1, "restoreOnOpen" to preferences.getBoolean("restoreOnOpen", false), "enabled" to config.first, "backend" to config.second,
             "ready" to (config.first && link != null), "uid" to link?.uid,
-            "reasonCode" to reason, "shizuku" to shizukuStatus, "adb" to adbStatus,
-            "limits" to mapOf("defaultTimeoutMs" to ShellProtocol.DEFAULT_TIMEOUT_MS,
-                "maxTimeoutMs" to ShellProtocol.MAX_TIMEOUT_MS, "maxOutputBytes" to ShellProtocol.MAX_OUTPUT_BYTES,
-                "maxCommandBytes" to ShellProtocol.MAX_COMMAND_BYTES),
+            "reasonCode" to reason, "allowWhenLocked" to lockedAllowed, "shizuku" to shizukuStatus, "adb" to adbStatus,
+            "limits" to currentLimits.toMap(),
         ) + approval.snapshot().statusFields()
+    }
+
+    fun limits(): ShellLimits = synchronized(guard) {
+        ShellLimits(ShellProtocol.DEFAULT_TIMEOUT_MS, maxTimeoutMs, maxOutputBytes, maxCommandBytes)
+    }
+
+    fun allowWhenLocked(): Boolean = synchronized(guard) { allowWhenLocked }
+
+    fun setLimits(
+        maxCommandBytes: Int? = null,
+        maxTimeoutMs: Long? = null,
+        maxOutputBytes: Int? = null,
+        allowWhenLocked: Boolean? = null,
+    ): Map<String, Any?> {
+        if (maxCommandBytes == null && maxTimeoutMs == null && maxOutputBytes == null && allowWhenLocked == null) {
+            return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        }
+        if (maxCommandBytes != null && maxCommandBytes !in ShellProtocol.commandByteOptions) {
+            return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        }
+        if (maxTimeoutMs != null && maxTimeoutMs !in ShellProtocol.maxTimeoutMsOptions) {
+            return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        }
+        if (maxOutputBytes != null && maxOutputBytes !in ShellProtocol.maxOutputByteOptions) {
+            return mapOf("ok" to false, "errorCode" to "invalidArguments")
+        }
+        synchronized(guard) {
+            val edit = preferences.edit()
+            if (maxCommandBytes != null) { this.maxCommandBytes = maxCommandBytes; edit.putInt("maxCommandBytes", maxCommandBytes) }
+            if (maxTimeoutMs != null) { this.maxTimeoutMs = maxTimeoutMs; edit.putLong("maxTimeoutMs", maxTimeoutMs) }
+            if (maxOutputBytes != null) { this.maxOutputBytes = maxOutputBytes; edit.putInt("maxOutputBytes", maxOutputBytes) }
+            if (allowWhenLocked != null) { this.allowWhenLocked = allowWhenLocked; edit.putBoolean("allowWhenLocked", allowWhenLocked) }
+            edit.commit()
+        }
+        onChanged()
+        return status() + mapOf("ok" to true, "errorCode" to null)
     }
 
     fun approvalMode(): ShellApprovalMode = approval.currentMode()
@@ -194,8 +240,9 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
         stillWanted: () -> Boolean,
         confirm: (backend: String, uid: Int) -> Decision,
     ): Map<String, Any?> {
-        ShellProtocol.commandError(command)?.let { return ShellProtocol.failure(it) }
-        ShellProtocol.timeoutError(timeoutMs)?.let { return ShellProtocol.failure(it) }
+        val currentLimits = limits()
+        ShellProtocol.commandError(command, currentLimits.maxCommandBytes)?.let { return ShellProtocol.failure(it) }
+        ShellProtocol.timeoutError(timeoutMs, currentLimits.maxTimeoutMs)?.let { return ShellProtocol.failure(it) }
         val lease = synchronized(guard) {
             if (!enabled) return ShellProtocol.failure("disabled")
             if (setupBusy || active != null) return ShellProtocol.failure("busy")
@@ -221,8 +268,18 @@ class AndroidShellController(context: Context, private val onChanged: () -> Unit
             if (!wanted()) return result(lease, ShellProtocol.failure("cancelled"))
             val allowRootRound = approval.currentMode() == ShellApprovalMode.TURN
             PhoneAndroidShell.confirmationError(decision, link.uid, allowRootRound)?.let { return result(lease, ShellProtocol.failure(it)) }
-            var response = link.call(mapOf("op" to "start", "jobId" to lease.id,
-                "command" to command, "timeoutMs" to timeoutMs, "uid" to link.uid)) {
+            val effectiveOutputBytes = if (lease.backend == "shizuku") {
+                minOf(currentLimits.maxOutputBytes, ShellProtocol.SHIZUKU_MAX_OUTPUT_BYTES)
+            } else {
+                currentLimits.maxOutputBytes
+            }
+            var response = link.call(mapOf(
+                "op" to "start", "jobId" to lease.id,
+                "command" to command, "timeoutMs" to timeoutMs, "uid" to link.uid,
+                "maxCommandBytes" to currentLimits.maxCommandBytes,
+                "maxTimeoutMs" to currentLimits.maxTimeoutMs,
+                "maxOutputBytes" to effectiveOutputBytes,
+            )) {
                 wanted() && synchronized(guard) {
                     if (active !== lease || lease.cancelled || generation != lease.generation || !enabled) false
                     else { lease.sent = true; true }

@@ -1,5 +1,23 @@
 package io.github.ccch1mneyyy.dsh_app.phone.shell
 
+data class ShellLimits(
+    val defaultTimeoutMs: Long = ShellProtocol.DEFAULT_TIMEOUT_MS,
+    val maxTimeoutMs: Long = ShellProtocol.MAX_TIMEOUT_MS,
+    val maxOutputBytes: Int = ShellProtocol.MAX_OUTPUT_BYTES,
+    val maxCommandBytes: Int = ShellProtocol.MAX_COMMAND_BYTES,
+) {
+    fun toMap(): Map<String, Any> = mapOf(
+        "defaultTimeoutMs" to defaultTimeoutMs,
+        "maxTimeoutMs" to maxTimeoutMs,
+        "maxOutputBytes" to maxOutputBytes,
+        "maxCommandBytes" to maxCommandBytes,
+    )
+
+    companion object {
+        val DEFAULT = ShellLimits()
+    }
+}
+
 /** Deliberately independent of the virtual-display protocol. */
 object ShellProtocol {
     const val REVISION = "dsh.android-shell.v1"
@@ -8,11 +26,19 @@ object ShellProtocol {
     const val MAX_TIMEOUT_MS = 60_000L
     const val MAX_OUTPUT_BYTES = 64 * 1024
     const val MAX_COMMAND_BYTES = 2048
+    const val HARD_MAX_TIMEOUT_MS = 600_000L
+    const val HARD_MAX_OUTPUT_BYTES = 512 * 1024
+    const val SHIZUKU_MAX_OUTPUT_BYTES = 256 * 1024
+    const val HARD_MAX_COMMAND_BYTES = 64 * 1024
     const val RPC_TIMEOUT_MS = 5_000L
 
-    fun commandError(command: String): String? = when {
+    val commandByteOptions = listOf(2048, 8 * 1024, 32 * 1024, 64 * 1024)
+    val maxTimeoutMsOptions = listOf(60_000L, 120_000L, 300_000L, 600_000L)
+    val maxOutputByteOptions = listOf(64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024)
+
+    fun commandError(command: String, maxCommandBytes: Int = MAX_COMMAND_BYTES): String? = when {
         command.isBlank() -> "invalidCommand"
-        command.toByteArray(Charsets.UTF_8).size > MAX_COMMAND_BYTES -> "commandTooLong"
+        command.toByteArray(Charsets.UTF_8).size > maxCommandBytes.coerceIn(MAX_COMMAND_BYTES, HARD_MAX_COMMAND_BYTES) -> "commandTooLong"
         command.any { c ->
             (c.code in 0..31 && c != '\n' && c != '\r' && c != '\t') ||
                 c.code in 127..159 || c.code in 0x202a..0x202e || c.code in 0x2066..0x2069 ||
@@ -21,8 +47,8 @@ object ShellProtocol {
         else -> null
     }
 
-    fun timeoutError(timeoutMs: Long): String? =
-        if (timeoutMs !in 100..MAX_TIMEOUT_MS) "invalidTimeout" else null
+    fun timeoutError(timeoutMs: Long, maxTimeoutMs: Long = MAX_TIMEOUT_MS): String? =
+        if (timeoutMs !in 100..maxTimeoutMs.coerceIn(MAX_TIMEOUT_MS, HARD_MAX_TIMEOUT_MS)) "invalidTimeout" else null
 
     val backends = setOf("adb", "shizuku", "root")
 

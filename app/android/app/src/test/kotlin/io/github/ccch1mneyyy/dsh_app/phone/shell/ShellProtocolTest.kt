@@ -60,4 +60,15 @@ class ShellProtocolTest {
         assertEquals(true, failure["cancelled"])
         assertEquals(true, ShellProtocol.failure("timeout")["timedOut"])
     }
+
+    @Test fun configurableLimitsRespectSelectedBoundsAndHardCeilings() {
+        assertNull(ShellProtocol.commandError("a".repeat(8192), 8192))
+        assertEquals("commandTooLong", ShellProtocol.commandError("a".repeat(8193), 8192))
+        assertNull(ShellProtocol.commandError("a".repeat(65_536), 65_536))
+        assertEquals("commandTooLong", ShellProtocol.commandError("a".repeat(65_537), 128 * 1024))
+        assertNull(ShellProtocol.timeoutError(300_000, 300_000))
+        assertEquals("invalidTimeout", ShellProtocol.timeoutError(300_001, 300_000))
+        assertNull(ShellProtocol.timeoutError(600_000, 600_000))
+        assertEquals("invalidTimeout", ShellProtocol.timeoutError(600_001, 900_000))
+    }
 }

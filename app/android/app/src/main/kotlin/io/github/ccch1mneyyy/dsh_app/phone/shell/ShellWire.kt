@@ -8,7 +8,7 @@ import java.io.OutputStream
 
 internal object ShellWire {
     val magic = "DSH_ANDROID_SHELL_V1\n".toByteArray(Charsets.US_ASCII)
-    const val MAX_FRAME = 512 * 1024
+    const val MAX_FRAME = 2 * 1024 * 1024
 
     fun write(output: OutputStream, bytes: ByteArray) {
         require(bytes.size <= MAX_FRAME)

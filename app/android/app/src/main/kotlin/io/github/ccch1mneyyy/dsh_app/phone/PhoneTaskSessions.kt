@@ -68,6 +68,9 @@ class PhoneTaskSessions(
         internal var finished: PhoneTasks.Owner? = null
         internal var pendingFinish: PhoneTasks.Owner? = null
         internal var returnClaimed = false
+        internal var activeTool: String? = null
+        internal var shellOnlyTask = false
+        internal var usedNonShell = false
         internal var skillScope: SkillScope? = null
         internal var journalRecord: PhoneTaskJournal.Record? = null
         internal var journalMarked = false
@@ -184,11 +187,11 @@ class PhoneTaskSessions(
     }
 
     /** Called while PhoneBridge still holds its launch lock, before dispatch enters its pool. */
-    fun admit(attribution: PhoneCaller?): Admission {
+    fun admit(attribution: PhoneCaller?, allowScreenOffBypass: Boolean = false): Admission {
         val startedAt = clock()
         // Platform state reads may use Binder; bind their result to the current stop epoch.
         val readinessEpoch = synchronized(lock) { epoch }
-        val screenReady = attribution?.runLifecycle == 1 && screenRecoveryReady()
+        val screenReady = attribution?.runLifecycle == 1 && (allowScreenOffBypass || screenRecoveryReady())
         return synchronized(lock) {
             if (attribution?.runLifecycle == 1) modernCallerSeen = true
             // l10n:keep agent resource admission
@@ -276,6 +279,13 @@ class PhoneTaskSessions(
                 if (remainingMs(admission) <= 0) return deadlineOutput()
                 if (!live(admission) || blocked(task) || task.closing) return stopped()
                 task.running = true
+                task.activeTool = name
+                if (name == PhoneToolCatalog.ANDROID_SHELL) {
+                    if (!task.usedNonShell) task.shellOnlyTask = true
+                } else {
+                    task.usedNonShell = true
+                    task.shellOnlyTask = false
+                }
                 running = true
             }
             // Legacy can start another logical task in this same record. Clean the prior
@@ -304,6 +314,8 @@ class PhoneTaskSessions(
                             }
                         }
                         synchronized(lock) {
+                            task.usedNonShell = name != PhoneToolCatalog.ANDROID_SHELL
+                            task.shellOnlyTask = name == PhoneToolCatalog.ANDROID_SHELL
                             if (live(admission) && !blocked(task)) task.tasks.runIfCurrent(b.owner) {
                                 startSkillScope(b.owner, task.sessionId, task.runId)?.let { draftEpoch ->
                                     task.skillScope = SkillScope(b.owner, draftEpoch, admission.epoch)
@@ -393,6 +405,7 @@ class PhoneTaskSessions(
                         }
                         // Keep this execution slot until the exact original MAIN decision is committed.
                         task.activeWorker = null
+                        task.activeTool = null
                         task.running = false
                         clearWaiting(task)
                         lock.notifyAll()
@@ -880,13 +893,26 @@ class PhoneTaskSessions(
         return synchronized(lock) { lastAdmitted[task.sessionId] === task } && task.tasks.isCurrent(owner)
     }
 
-    fun stopAll(reason: String, source: PhoneTasks.StopSource = PhoneTasks.StopSource.ENVIRONMENT) {
+    fun stopAll(
+        reason: String,
+        source: PhoneTasks.StopSource = PhoneTasks.StopSource.ENVIRONMENT,
+        keepAndroidShell: Boolean = false,
+    ) {
         data class PendingStop(val task: Task, val change: PhoneTasks.Change, val ownsCancellation: Boolean)
         val pending = synchronized(lock) {
-            epoch++
+            val preserveShell = source == PhoneTasks.StopSource.SCREEN_OFF && keepAndroidShell
+            val targets = if (preserveShell) {
+                entries.values.filterNot { task ->
+                    task !in backgroundHolders &&
+                        (task.activeTool == PhoneToolCatalog.ANDROID_SHELL || (task.shellOnlyTask && !task.usedNonShell))
+                }
+            } else {
+                entries.values.toList()
+            }
+            if (targets.size == entries.size) epoch++
             selfCheck?.sealed = true
             if (source != PhoneTasks.StopSource.SCREEN_OFF) screenStoppedSessions.clear()
-            entries.values.map { task ->
+            targets.map { task ->
                 // A prior cancellation keeps responsibility for its external work. Still
                 // invalidate this lifetime now. An idle record must not gain a stop hold or
                 // a session fence merely because the screen/service disappeared.

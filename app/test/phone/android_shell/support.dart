@@ -66,6 +66,18 @@ class ShellNative {
           'approvalUntilRestart': mode == 'temporary' && durationMs == null,
         };
         return {'ok': true};
+      case 'androidShellSetLimits':
+        final args = call.arguments as Map;
+        final limits = Map<String, Object?>.from(status['limits'] as Map? ?? const {});
+        for (final key in const ['maxCommandBytes', 'maxTimeoutMs', 'maxOutputBytes']) {
+          if (args.containsKey(key)) limits[key] = args[key];
+        }
+        status = {
+          ...status,
+          if (args.containsKey('allowWhenLocked')) 'allowWhenLocked': args['allowWhenLocked'],
+          'limits': limits,
+        };
+        return {'ok': true};
       case 'androidShellRequestPermission':
         return true;
       case 'androidShellPair':

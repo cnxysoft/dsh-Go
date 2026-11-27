@@ -292,4 +292,18 @@ class ShellJobCoreTest {
         try { assertEquals("jobNotFound", core.poll("unknown")["errorCode"]) }
         finally { core.destroy() }
     }
+
+    @Test fun customOutputAndCommandLimitsAreEnforcedPerJob() {
+        val child = Child(ByteArray(150_000) { 65 })
+        val core = ShellJobCore { _, _ -> child }
+        try {
+            val longCmd = "echo " + "x".repeat(4000)
+            assertEquals("commandTooLong", core.start("too-long", longCmd, 1000)["errorCode"])
+            core.start("custom", longCmd, 120_000, maxCommandBytes = 8192, maxTimeoutMs = 120_000, maxOutputBytes = 128 * 1024)
+            val result = finished(core, "custom")
+            assertEquals(128 * 1024, (result["stdout"] as String).length)
+            assertEquals(true, result["truncated"])
+            assertEquals(150_000, child.outBytes.get())
+        } finally { core.destroy() }
+    }
 }

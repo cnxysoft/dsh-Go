@@ -29,7 +29,7 @@ internal class ShellJobCore(private val launch: (String, Long) -> ShellOwnedProc
         Thread(runnable, "dsh-shell-deadline").apply { isDaemon = true }
     }
 
-    private class Job(val id: String) {
+    private class Job(val id: String, val maxOutputBytes: Int) {
         val stdout = ByteArrayOutputStream()
         val stderr = ByteArrayOutputStream()
         var process: ShellOwnedProcess? = null
@@ -44,18 +44,28 @@ internal class ShellJobCore(private val launch: (String, Long) -> ShellOwnedProc
         var bytes = 0
     }
 
-    fun start(id: String, command: String, timeoutMs: Long): Map<String, Any?> = synchronized(guard) {
+    fun start(
+        id: String,
+        command: String,
+        timeoutMs: Long,
+        maxCommandBytes: Int = ShellProtocol.MAX_COMMAND_BYTES,
+        maxTimeoutMs: Long = ShellProtocol.MAX_TIMEOUT_MS,
+        maxOutputBytes: Int = ShellProtocol.MAX_OUTPUT_BYTES,
+    ): Map<String, Any?> = synchronized(guard) {
         if (closed) return ShellProtocol.failure("notConnected")
         if (!validJobId(id)) return ShellProtocol.failure("invalidArguments")
-        ShellProtocol.commandError(command)?.let { return ShellProtocol.failure(it) }
-        ShellProtocol.timeoutError(timeoutMs)?.let { return ShellProtocol.failure(it) }
+        val cmdLimit = maxCommandBytes.coerceIn(ShellProtocol.MAX_COMMAND_BYTES, ShellProtocol.HARD_MAX_COMMAND_BYTES)
+        val timeLimit = maxTimeoutMs.coerceIn(ShellProtocol.MAX_TIMEOUT_MS, ShellProtocol.HARD_MAX_TIMEOUT_MS)
+        val outLimit = maxOutputBytes.coerceIn(ShellProtocol.MAX_OUTPUT_BYTES, ShellProtocol.HARD_MAX_OUTPUT_BYTES)
+        ShellProtocol.commandError(command, cmdLimit)?.let { return ShellProtocol.failure(it) }
+        ShellProtocol.timeoutError(timeoutMs, timeLimit)?.let { return ShellProtocol.failure(it) }
         current?.let {
             if (it.id == id) return snapshot(it).map() // A lost start reply is never a replay.
             if (!it.done) return ShellProtocol.failure("busy")
         }
         if (id in retired) return ShellProtocol.failure("cancelled")
         current?.let { remember(it.id) }
-        val job = Job(id)
+        val job = Job(id, outLimit)
         current = job
         job.deadline = timer.schedule({ stop(job, timedOut = true) }, timeoutMs, TimeUnit.MILLISECONDS)
         Thread({ run(job, command, timeoutMs) }, "dsh-shell-job").apply { isDaemon = true; start() }
@@ -160,7 +170,7 @@ internal class ShellJobCore(private val launch: (String, Long) -> ShellOwnedProc
                     if (count < 0) break
                     synchronized(guard) {
                         if (job.done) return@Thread
-                        val keep = minOf(count, ShellProtocol.MAX_OUTPUT_BYTES - job.bytes)
+                        val keep = minOf(count, job.maxOutputBytes - job.bytes)
                         if (keep > 0) {
                             (if (stdout) job.stdout else job.stderr).write(buffer, 0, keep)
                             job.bytes += keep

@@ -1936,6 +1936,54 @@ class L10nZh extends L10n {
   String get androidShellApprovalAlwaysRiskAction => '开启全局免确认';
 
   @override
+  String get androidShellExecutionSection => '运行限制与锁屏';
+
+  @override
+  String get androidShellAllowWhenLocked => '息屏 / 锁屏时允许执行';
+
+  @override
+  String get androidShellAllowWhenLockedHint =>
+      '关闭屏幕或锁屏后继续执行 Android Shell，适合息屏跑长任务；需搭配免确认或本轮已授权，否则无法弹窗确认。不影响屏幕操控的锁屏限制。';
+
+  @override
+  String get androidShellAllowWhenLockedRiskTitle => '允许息屏 / 锁屏时执行命令？';
+
+  @override
+  String get androidShellAllowWhenLockedRiskBody =>
+      '开启后，关闭屏幕或锁屏时不会中断或拒绝 Android Shell（含 Root）命令，方便息屏让模型继续执行任务。请确保当前确认模式符合你的预期；随时可在本页关闭。';
+
+  @override
+  String get androidShellAllowWhenLockedRiskAction => '允许息屏执行';
+
+  @override
+  String get androidShellMaxCommandTitle => '命令长度上限';
+
+  @override
+  String get androidShellMaxTimeoutTitle => '单次最长超时';
+
+  @override
+  String get androidShellMaxOutputTitle => '输出体积上限';
+
+  @override
+  String get androidShellMaxOutputShizukuHint =>
+      'Shizuku 受 Android Binder 事务大小限制，实际单次输出上限为 256 KB；直连 Root 与自连 ADB 可完整使用 512 KB。';
+
+  @override
+  String androidShellLimitKb(int kb) {
+    return '$kb KB';
+  }
+
+  @override
+  String androidShellLimitSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String androidShellLimitMinutes(int minutes) {
+    return '$minutes 分钟';
+  }
+
+  @override
   String get androidBackgroundProtectionTitle => '增强保活';
 
   @override

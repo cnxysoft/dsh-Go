@@ -260,6 +260,44 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                     else -> async(result, shortControl = true) { control.shell.setApproval(mode, durationMs) }
                 }
             }
+            "androidShellSetLimits" -> {
+                val args = call.arguments as? Map<*, *>
+                val allowedKeys = setOf("maxCommandBytes", "maxTimeoutMs", "maxOutputBytes", "allowWhenLocked")
+                fun parseInt(key: String): Pair<Boolean, Int?> {
+                    if (args == null || key !in args) return true to null
+                    val v = args[key]
+                    return when (v) {
+                        is Int -> true to v
+                        is Long -> if (v in Int.MIN_VALUE..Int.MAX_VALUE) true to v.toInt() else false to null
+                        else -> false to null
+                    }
+                }
+                fun parseLong(key: String): Pair<Boolean, Long?> {
+                    if (args == null || key !in args) return true to null
+                    val v = args[key]
+                    return when (v) {
+                        is Int -> true to v.toLong()
+                        is Long -> true to v
+                        else -> false to null
+                    }
+                }
+                val (cmdOk, maxCommandBytes) = parseInt("maxCommandBytes")
+                val (timeOk, maxTimeoutMs) = parseLong("maxTimeoutMs")
+                val (outOk, maxOutputBytes) = parseInt("maxOutputBytes")
+                val lockPresent = args != null && "allowWhenLocked" in args
+                val allowWhenLocked = if (lockPresent) args?.get("allowWhenLocked") as? Boolean else null
+                val lockOk = !lockPresent || allowWhenLocked != null
+                when {
+                    args == null || args.isEmpty() || args.keys.any { it !in allowedKeys } ||
+                        !cmdOk || !timeOk || !outOk || !lockOk ->
+                        result.success(mapOf("ok" to false, "errorCode" to "invalidArguments"))
+                    allowWhenLocked == true && control.isLocked() ->
+                        result.success(mapOf("ok" to false, "errorCode" to "locked"))
+                    else -> async(result, shortControl = true) {
+                        control.shell.setLimits(maxCommandBytes, maxTimeoutMs, maxOutputBytes, allowWhenLocked)
+                    }
+                }
+            }
             "androidShellRequestPermission" -> async(result) { control.shell.requestShizukuPermission() }
             "androidShellStartPairing" -> async(result) { control.shell.startAdbPairing() }
             "androidShellPair" -> {

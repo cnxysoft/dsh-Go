@@ -213,6 +213,54 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
     });
   }
 
+  String _formatTimeout(L10n l10n, int ms) {
+    final seconds = ms ~/ 1000;
+    if (seconds >= 120 && seconds % 60 == 0) return l10n.androidShellLimitMinutes(seconds ~/ 60);
+    return l10n.androidShellLimitSeconds(seconds);
+  }
+
+  Future<void> _toggleAllowWhenLocked(bool allow) => _run(() async {
+    final operation = _operation;
+    if (allow) {
+      final l10n = context.l10n;
+      final accepted = await confirmRisk(
+        context,
+        RiskNotice(
+          id: 'phone.android-shell.allow-when-locked',
+          level: RiskLevel.high,
+          title: l10n.androidShellAllowWhenLockedRiskTitle,
+          body: l10n.androidShellAllowWhenLockedRiskBody,
+          action: l10n.androidShellAllowWhenLockedRiskAction,
+        ),
+      );
+      if (!accepted || !mounted || operation != _operation) return const AndroidShellResult(true);
+    }
+    return _channel.setLimits(allowWhenLocked: allow);
+  });
+
+  Future<void> _pickLimit({
+    required String title,
+    required List<int> options,
+    required int current,
+    required String Function(int value) labelOf,
+    String? hint,
+    required Future<AndroidShellResult> Function(int selected) onSelected,
+  }) async {
+    if (_busy || _stopping) return;
+    final picked = await showAppDialog<int>(
+      context: context,
+      builder: (_) => _LimitChoiceDialog(
+        title: title,
+        options: options,
+        current: current,
+        labelOf: labelOf,
+        hint: hint,
+      ),
+    );
+    if (picked == null || picked == current || !mounted) return;
+    await _run(() => onSelected(picked));
+  }
+
   /// Stop remains available while a pairing/connection request is pending.
   Future<void> _stop() async {
     if (_stopping) return;
@@ -248,6 +296,9 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
     final reasonCode = _status.reasonCode;
     final timeout = _status.limits['maxTimeoutMs'];
     final output = _status.limits['maxOutputBytes'];
+    final maxCommandBytes = _status.limits['maxCommandBytes'] ?? 2048;
+    final maxTimeoutMs = timeout ?? 60000;
+    final maxOutputBytes = output ?? 65536;
     final shizuku = _status.backend == AndroidShellBackend.shizuku;
     final adb = _status.backend == AndroidShellBackend.adb;
     final root = _status.backend == AndroidShellBackend.root;
@@ -412,6 +463,73 @@ class _AndroidShellPageState extends ConsumerState<AndroidShellPage> {
             ),
           ],
         ),
+        ListPageCard(
+          margin: _margin,
+          title: l10n.androidShellExecutionSection,
+          children: [
+            ListPageRow(
+              title: l10n.androidShellAllowWhenLocked,
+              subtitle: l10n.androidShellAllowWhenLockedHint,
+              subtitleMaxLines: 4,
+              trailing: Switch(
+                key: const ValueKey('android-shell-allow-when-locked'),
+                value: _status.allowWhenLocked,
+                onChanged: canSetup ? (value) => unawaited(_toggleAllowWhenLocked(value)) : null,
+              ),
+            ),
+            ListPageRow(
+              key: const ValueKey('android-shell-max-command'),
+              title: l10n.androidShellMaxCommandTitle,
+              value: l10n.androidShellLimitKb(maxCommandBytes ~/ 1024),
+              onTap: canSetup
+                  ? () => unawaited(
+                      _pickLimit(
+                        title: l10n.androidShellMaxCommandTitle,
+                        options: AndroidShellChannel.commandByteOptions,
+                        current: maxCommandBytes,
+                        labelOf: (v) => l10n.androidShellLimitKb(v ~/ 1024),
+                        onSelected: (v) => _channel.setLimits(maxCommandBytes: v),
+                      ),
+                    )
+                  : null,
+            ),
+            ListPageRow(
+              key: const ValueKey('android-shell-max-timeout'),
+              title: l10n.androidShellMaxTimeoutTitle,
+              value: _formatTimeout(l10n, maxTimeoutMs),
+              onTap: canSetup
+                  ? () => unawaited(
+                      _pickLimit(
+                        title: l10n.androidShellMaxTimeoutTitle,
+                        options: AndroidShellChannel.maxTimeoutMsOptions,
+                        current: maxTimeoutMs,
+                        labelOf: (v) => _formatTimeout(l10n, v),
+                        onSelected: (v) => _channel.setLimits(maxTimeoutMs: v),
+                      ),
+                    )
+                  : null,
+            ),
+            ListPageRow(
+              key: const ValueKey('android-shell-max-output'),
+              title: l10n.androidShellMaxOutputTitle,
+              subtitle: shizuku && maxOutputBytes > 262144 ? l10n.androidShellMaxOutputShizukuHint : null,
+              subtitleMaxLines: 3,
+              value: l10n.androidShellLimitKb(maxOutputBytes ~/ 1024),
+              onTap: canSetup
+                  ? () => unawaited(
+                      _pickLimit(
+                        title: l10n.androidShellMaxOutputTitle,
+                        options: AndroidShellChannel.maxOutputByteOptions,
+                        current: maxOutputBytes,
+                        labelOf: (v) => l10n.androidShellLimitKb(v ~/ 1024),
+                        hint: shizuku ? l10n.androidShellMaxOutputShizukuHint : null,
+                        onSelected: (v) => _channel.setLimits(maxOutputBytes: v),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
+        ),
         PhoneOptionsFold(
           key: const ValueKey('android-shell-details'),
           title: l10n.androidShellDetails,
@@ -565,6 +683,52 @@ class _ApprovalChoiceDialog extends StatelessWidget {
               enabled: allowRelax,
               choice: const _ApprovalChoice(AndroidShellApprovalMode.always),
             ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel))],
+    );
+  }
+}
+
+class _LimitChoiceDialog extends StatelessWidget {
+  const _LimitChoiceDialog({
+    required this.title,
+    required this.options,
+    required this.current,
+    required this.labelOf,
+    this.hint,
+  });
+
+  final String title;
+  final List<int> options;
+  final int current;
+  final String Function(int value) labelOf;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AlertDialog(
+      title: Text(title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hint case final note?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(note, style: Theme.of(context).textTheme.bodySmall),
+              ),
+            for (final option in options)
+              ListTile(
+                key: ValueKey('android-shell-limit-opt-$option'),
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(option == current ? AppIcons.radioOn : AppIcons.radioOff),
+                title: Text(labelOf(option)),
+                onTap: () => Navigator.pop(context, option),
+              ),
           ],
         ),
       ),

@@ -24,7 +24,14 @@ internal class ShellHost(classpath: String) {
         ) else if (request.getString("instance") != instance) ShellProtocol.failure("identityChanged")
         else when (op) {
             "start" -> if (request.getInt("uid", -1) != Process.myUid()) ShellProtocol.failure("identityChanged")
-                else core.start(request.getString("jobId").orEmpty(), request.getString("command").orEmpty(), request.getLong("timeoutMs", 0))
+                else core.start(
+                    request.getString("jobId").orEmpty(),
+                    request.getString("command").orEmpty(),
+                    request.getLong("timeoutMs", 0),
+                    request.getInt("maxCommandBytes", ShellProtocol.MAX_COMMAND_BYTES),
+                    request.getLong("maxTimeoutMs", ShellProtocol.MAX_TIMEOUT_MS),
+                    request.getInt("maxOutputBytes", ShellProtocol.MAX_OUTPUT_BYTES),
+                )
             "poll" -> core.poll(request.getString("jobId").orEmpty())
             "cancel" -> core.cancel(request.getString("jobId").orEmpty())
             "destroy" -> { core.destroy(); mapOf("ok" to true) }

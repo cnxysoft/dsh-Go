@@ -1,6 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.phone
 
 import io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode
+import io.github.ccch1mneyyy.dsh_app.phone.shell.ShellLimits
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 import org.junit.Assert.*
@@ -19,6 +20,8 @@ class PhoneAndroidShellTest {
         var uid = 2000
         var policies = PhonePolicies()
         var approvalMode = ShellApprovalMode.EVERY
+        var limits = ShellLimits.DEFAULT
+        var allowWhenLocked = false
         var decision = Decision.ALLOW_ONCE
         var beforeConfirm: () -> Unit = {}
         var onConfirm: (ConfirmRequest) -> Unit = {}
@@ -52,6 +55,8 @@ class PhoneAndroidShellTest {
             override fun isLocked() = locked
             override fun androidShell() = executor.takeIf { backendAvailable }
             override fun androidShellApprovalMode() = approvalMode
+            override fun androidShellLimits() = limits
+            override fun androidShellAllowWhenLocked() = allowWhenLocked
             override fun gate() = if (!gateAvailable) null else object : UserGate {
                 override fun confirm(request: ConfirmRequest): Decision {
                     asks += request
@@ -419,6 +424,49 @@ class PhoneAndroidShellTest {
                 assertTrue(task.heldApps.isEmpty())
                 assertFalse(sessions.snapshot().single { it["sessionId"] == "session-shell" }["backgroundSlot"] as Boolean)
                 assertEquals(1, f.dispatches)
+            } finally { sessions.retire() }
+        }
+    }
+
+    @Test fun configuredLimitsAllowLongerCommandsAndTimeouts() {
+        Fixture().use { f ->
+            f.limits = ShellLimits(maxTimeoutMs = 300_000L, maxOutputBytes = 256 * 1024, maxCommandBytes = 8192)
+            val longCmd = "echo " + "x".repeat(4000)
+            assertFalse(f.call(longCmd, mapOf("timeout_ms" to 240_000)).isError)
+            assertEquals(longCmd, f.capturedCommand)
+            assertEquals(240_000L, f.capturedTimeout)
+            assertTrue(f.call("x".repeat(8193)).isError)
+            assertTrue(f.call("id", mapOf("timeout_ms" to 300_001)).isError)
+        }
+    }
+
+    @Test fun allowWhenLockedPermitsLockedShellAndPreservesShellSessionAcrossScreenOff() {
+        Fixture().use { f ->
+            f.locked = true
+            f.allowWhenLocked = true
+            f.approvalMode = ShellApprovalMode.ALWAYS
+            assertFalse(f.call("id").isError)
+            assertEquals(1, f.dispatches)
+
+            val ids = AtomicLong()
+            val sessions = PhoneTaskSessions(System::currentTimeMillis, ids::incrementAndGet,
+                { tasks, _ -> PhoneCore(f.env, tasks, f.log, f.core.worker) }, f.tasks, f.core,
+                screenRecoveryReady = { !f.locked })
+            try {
+                val caller = PhoneCaller("session-locked-shell", "run-1", "call-1", 1)
+                val first = sessions.admit(caller, allowScreenOffBypass = true)
+                assertFalse(sessions.run(first, PhoneToolCatalog.ANDROID_SHELL, mapOf("command" to "id")).isError)
+
+                // Screen-off with keepAndroidShell preserves the shell-only session for subsequent calls in the same run.
+                sessions.stopAll("熄屏", PhoneTasks.StopSource.SCREEN_OFF, keepAndroidShell = true)
+                val second = sessions.admit(PhoneCaller("session-locked-shell", "run-1", "call-2", 1), allowScreenOffBypass = true)
+                assertFalse(sessions.run(second, PhoneToolCatalog.ANDROID_SHELL, mapOf("command" to "id")).isError)
+                assertEquals(3, f.dispatches)
+
+                // Explicit user stop always stops the shell session regardless of allowWhenLocked.
+                sessions.stopAll("用户停止", PhoneTasks.StopSource.USER, keepAndroidShell = true)
+                val afterUserStop = sessions.admit(PhoneCaller("session-locked-shell", "run-1", "call-3", 1), allowScreenOffBypass = true)
+                assertTrue(sessions.run(afterUserStop, PhoneToolCatalog.ANDROID_SHELL, mapOf("command" to "id")).isError)
             } finally { sessions.retire() }
         }
     }

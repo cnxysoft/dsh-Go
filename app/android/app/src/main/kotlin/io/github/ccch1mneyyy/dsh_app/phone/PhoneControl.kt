@@ -210,7 +210,10 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     private val bridge = PhoneBridge(server, { line -> logger(line) }, { call ->
         if (call.name == DiagnosticsTool.NAME) PhoneCallWork({ call.run() })
         else if (call.name == PhoneCore.REPLAY) replayWork(call) else {
-        val admission = sessions.admit(call.caller)
+        val admission = sessions.admit(
+            call.caller,
+            allowScreenOffBypass = call.name == PhoneToolCatalog.ANDROID_SHELL && shell.allowWhenLocked(),
+        )
         val nativeReplyCommit = PhoneReplyCommit()
         PhoneCallWork(
             invoke = { call.runWithCommit(nativeReplyCommit) { name, args, caller ->
@@ -780,7 +783,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
                 selfCheck.stop()
                 preview.refresh()
                 background.requestInterrupt {
-                    sessions.stopAll("熄屏", PhoneTasks.StopSource.SCREEN_OFF) // l10n:keep agent stop reason
+                    sessions.stopAll("熄屏", PhoneTasks.StopSource.SCREEN_OFF, keepAndroidShell = shell.allowWhenLocked()) // l10n:keep agent stop reason
                 }
                 cleanupIo.execute { background.finishInterrupt() }
             }
@@ -1083,7 +1086,12 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     override fun shownControls(): TaskControls? =
         displaySelection.controls { task, owner, reason -> stopOwner(task, owner, reason) }
 
-    override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) { shell.cancelActive(); selfCheck.stop(); sessions.stopAll(reason, source) }
+    override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) {
+        val keepShell = source == PhoneTasks.StopSource.SCREEN_OFF && shell.allowWhenLocked()
+        if (!keepShell) shell.cancelActive()
+        selfCheck.stop()
+        sessions.stopAll(reason, source, keepAndroidShell = keepShell)
+    }
 
     override fun onAccessibilityChanged(connected: Boolean) = emitStatus()
 
@@ -1153,6 +1161,11 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
 
     override fun androidShellApprovalMode(): io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode =
         shell.approvalMode()
+
+    override fun androidShellLimits(): io.github.ccch1mneyyy.dsh_app.phone.shell.ShellLimits =
+        shell.limits()
+
+    override fun androidShellAllowWhenLocked(): Boolean = shell.allowWhenLocked()
 
     override fun zone(): ZoneId = ZoneId.systemDefault()
 

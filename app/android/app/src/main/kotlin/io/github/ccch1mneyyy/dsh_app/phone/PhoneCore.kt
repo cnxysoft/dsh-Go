@@ -30,6 +30,9 @@ interface PhoneEnv {
     fun androidShell(): PhoneShellExecutor? = null
     fun androidShellApprovalMode(): io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode =
         io.github.ccch1mneyyy.dsh_app.phone.shell.ShellApprovalMode.EVERY
+    fun androidShellLimits(): io.github.ccch1mneyyy.dsh_app.phone.shell.ShellLimits =
+        io.github.ccch1mneyyy.dsh_app.phone.shell.ShellLimits.DEFAULT
+    fun androidShellAllowWhenLocked(): Boolean = false
     fun uiText(): PhoneUiText = PhoneUiText.DEFAULT
     fun zone(): ZoneId
     /** Tells the person what to fix (accessibility off, …); at most once per task and kind. */
@@ -273,7 +276,7 @@ class PhoneCore(
         if (prepared?.replay == null) rejection(name)?.let { return it }
         val remaining = remainingMs()
         val outcome = if (remaining <= 0) SerialWorker.Outcome.TimedOut(queued = true) else
-            executionWorker.run(budgetMs(name), remaining, owner = tasks) { scope ->
+            executionWorker.run(callBudgetMs(name), remaining, owner = tasks) { scope ->
                 if (remainingMs() <= 0) throw InterruptedException()
                 execute(name, args, scope, callOwner, prepared)
             }
@@ -402,13 +405,20 @@ class PhoneCore(
     private fun current(owner: PhoneTasks.Owner): Boolean =
         tasks.isCurrent(owner) && !Thread.currentThread().isInterrupted
 
+    private fun callBudgetMs(tool: String): Long =
+        if (tool == PhoneToolCatalog.ANDROID_SHELL) {
+            maxOf(budgetMs(tool), env.androidShellLimits().maxTimeoutMs + 15_000L).coerceAtMost(MAX_TOTAL_MS)
+        } else budgetMs(tool)
+
     private fun androidShell(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, localPromptMatched: Boolean): Out {
-        val request = PhoneAndroidShell.parse(a) ?: return Out(
+        val limits = env.androidShellLimits()
+        val request = PhoneAndroidShell.parse(a, limits) ?: return Out(
             Json.write(PhoneAndroidShell.failure("invalidArguments")), error = true)
         // Arbitrary system effects cannot become an implicitly verified UI replay route.
         skillTrace.markIncomplete(owner, PhoneTaskTrace.Gap.UNCERTAIN_RESULT)
         val result = PhoneAndroidShell.run(request, owner, tasks, scope, env.androidShell(),
-            env::enabled, env::isLocked, env::gate, ui, localPromptMatched, env::androidShellApprovalMode)
+            env::enabled, env::isLocked, env::gate, ui, localPromptMatched,
+            env::androidShellApprovalMode, env::androidShellAllowWhenLocked)
         val successfulExit = when (val code = result["exitCode"]) {
             is Int -> code == 0
             is Long -> code == 0L
