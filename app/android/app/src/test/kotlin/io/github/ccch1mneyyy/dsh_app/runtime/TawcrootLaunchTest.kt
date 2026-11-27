@@ -52,9 +52,18 @@ class TawcrootLaunchTest {
         assertTrue(before.containsAll(listOf("/storage/emulated/0:/sdcard", "/storage:/storage", "$root:$root")))
     }
 
+    @Test fun hostMountBindsUnderMntHostAreAccepted() {
+        val binds = fixedBinds + listOf("/sdcard/Projects:/mnt/host/projects", "/data/local/tmp/work:/mnt/host/work")
+        val plan = TawcrootLaunch.prepare(root, native, proot(binds), hostEnv)
+        val before = plan.argv.takeWhile { it != "--" }
+        assertTrue(before.containsAll(listOf("/sdcard/Projects:/mnt/host/projects", "/data/local/tmp/work:/mnt/host/work")))
+    }
+
     @Test fun anythingElseStaysOnProot() {
         val cases = listOf(
             proot(fixedBinds + "/data/other:/mnt"),
+            proot(fixedBinds + "/data/other:/mnt/host"),
+            proot(fixedBinds + "/data/other:/mnt/host/nested/dir"),
             proot(fixedBinds.drop(1)),
             proot(fixedBinds + "/dev"),
             proot(tail = listOf("/bin/sh", "-c", command)),

@@ -91,6 +91,7 @@ enum SettingsPageId {
   privacy,
   sharedLinks,
   engine,
+  hostMounts,
   remote,
   engineParams,
   subagent,
@@ -607,6 +608,15 @@ final _pages = <SettingsPageMeta>[
     keywords: (l) => l.searchKwEngine,
     freq: Freq.medium,
     links: const ['engine'],
+  ),
+  SettingsPageMeta(
+    SettingsPageId.hostMounts,
+    title: (l) => l.hubSettingsHostMounts,
+    parent: SettingsPageId.engine,
+    keywords: (l) => l.searchKwHostMounts,
+    links: const ['host-mounts'],
+    condition: SpotCondition.localHost,
+    androidOnly: true,
   ),
   SettingsPageMeta(
     SettingsPageId.remote,

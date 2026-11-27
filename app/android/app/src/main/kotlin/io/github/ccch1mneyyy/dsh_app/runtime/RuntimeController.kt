@@ -679,13 +679,21 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 timeline.spawned()
                 val direct = directEngine()
                 val tawc = tawcEngine()
-                p.start(env, if (storage) PhoneStorage.binds() else emptyList(), safe, phone, direct.requested, direct.failed, searchOverlay, authOverlay, speechOverlay,
+                val hostMounts = if (safe) emptyList() else HostMounts.prepareBinds(installer.rootfs, HostMounts.read(app)) {
+                    log(it, "system")
+                }
+                if (hostMounts.isNotEmpty()) {
+                    log("[dsh-app] host mounts active: ${hostMounts.joinToString { "${it.hostPath} -> ${it.guestPath}" }}", "system")
+                }
+                val extraBinds = (if (storage) PhoneStorage.binds() else emptyList()) + hostMounts.map { it.bindSpec }
+                p.start(env, extraBinds, safe, phone, direct.requested, direct.failed, searchOverlay, authOverlay, speechOverlay,
                     tawcEngine = tawc.saved == true, tawcFailed = tawc.failed) { actualDirect ->
                     // SafeMode.prepare writes its own briefing; leave the original home untouched.
                     if (!safe) GuestSetup.writeAgentsMd(
                         installer.rootfs, storage, phone && PhoneControl.switchedOn(app), pendingVisualReplies, actualDirect,
                         nativeLocale = if (AppStrings.isEnglish(app)) "en" else "zh-CN",
                         managedAgentsMd = pendingManagedAgentsMd,
+                        hostMounts = hostMounts,
                     )
                 }
                 if (phone) PhoneControl.get(app).launched(p.phoneMounted)

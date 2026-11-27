@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../account/account_page.dart';
 import '../../engine/engine_screen.dart';
+import '../../engine/host_mounts_page.dart';
 import '../../engine_settings/engine_settings_hub.dart';
 import '../../engine_settings/runtime_settings_pages.dart';
 import '../../engine_settings/subagent_settings_page.dart';
@@ -70,6 +71,7 @@ Widget settingsPage(SettingsPageId id, {String? sessionId}) => switch (id) {
   SettingsPageId.systemActions => const SystemActionsPage(),
   SettingsPageId.linuxEnvironment => const LinuxEnvironmentPage(),
   SettingsPageId.engine => const EngineScreen(),
+  SettingsPageId.hostMounts => const HostMountsPage(),
   SettingsPageId.background => const BackgroundGuidePage(),
   SettingsPageId.systemAccess => const SystemAccessPage(),
   SettingsPageId.diagnostics => const DiagnosticsPage(),

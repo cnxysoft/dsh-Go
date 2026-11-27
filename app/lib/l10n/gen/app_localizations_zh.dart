@@ -10692,6 +10692,70 @@ class L10nZh extends L10n {
   String get hubSettingsPhoneFilesHint => 'AI 可读写手机存储';
 
   @override
+  String get hubSettingsHostMounts => '宿主机挂载目录';
+
+  @override
+  String get hubSettingsHostMountsHint => '挂载多个手机目录到 /mnt/host/<名称>';
+
+  @override
+  String hubSettingsHostMountsCount(int count) {
+    return '已配置 $count 个挂载目录';
+  }
+
+  @override
+  String get hubSettingsHostMountsSubtitle => '将额外的手机目录映射到 Linux 容器，并加入工作区快捷选择';
+
+  @override
+  String get hubSettingsHostMountsListTitle => '已挂载目录';
+
+  @override
+  String get hubSettingsHostMountsEmpty => '还没有宿主机挂载目录';
+
+  @override
+  String get hubSettingsHostMountsEmptyHint => '添加后将映射到 /mnt/host/<名称>，可在工作区选择器中一键切换';
+
+  @override
+  String get hubSettingsHostMountsAdd => '添加宿主机目录';
+
+  @override
+  String get hubSettingsHostMountsPickFolder => '从系统选择文件夹';
+
+  @override
+  String get hubSettingsHostMountsPathLabel => '宿主机路径';
+
+  @override
+  String get hubSettingsHostMountsNameLabel => '容器内名称（可选）';
+
+  @override
+  String get hubSettingsHostMountsNameHint => '默认使用文件夹名';
+
+  @override
+  String hubSettingsHostMountsGuestPreview(String path) {
+    return '容器内路径：$path';
+  }
+
+  @override
+  String get hubSettingsHostMountsInvalidPath => '请输入有效的绝对路径（不能为 /，不含冒号或 ..）';
+
+  @override
+  String get hubSettingsHostMountsInvalidName => '名称不能为空，也不能包含 /、: 或 ..';
+
+  @override
+  String get hubSettingsHostMountsDuplicate => '这个宿主机目录已经添加过了';
+
+  @override
+  String get hubSettingsHostMountsPickFailed => '无法读取所选文件夹路径，请改为手动输入路径';
+
+  @override
+  String get hubSettingsHostMountsNote => '增删挂载目录后需重启本机引擎生效；启动时不可读的目录会自动跳过，不会阻断启动。';
+
+  @override
+  String get hubSettingsHostMountsGrantStorage => '开启所有文件访问权限';
+
+  @override
+  String get hubSettingsHostMountsGrantStorageHint => '若要挂载 /sdcard 下的目录，请先授予系统文件访问权限';
+
+  @override
   String get hubSettingsVisualReplies => '可视化回复';
 
   @override
@@ -19169,6 +19233,9 @@ class L10nZh extends L10n {
 
   @override
   String get searchKwPhoneFiles => '存储,文件,相册,下载,手机存储';
+
+  @override
+  String get searchKwHostMounts => '挂载,目录,宿主机,工作区,绑定,/mnt/host';
 
   @override
   String get searchKwVisualReplies => '图表,卡片,可视化,选项';

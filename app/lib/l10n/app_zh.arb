@@ -6379,6 +6379,40 @@
   "hubSettingsAutoCommands": "自动执行命令",
   "hubSettingsPhoneFiles": "访问手机文件",
   "hubSettingsPhoneFilesHint": "AI 可读写手机存储",
+  "hubSettingsHostMounts": "宿主机挂载目录",
+  "hubSettingsHostMountsHint": "挂载多个手机目录到 /mnt/host/<名称>",
+  "hubSettingsHostMountsCount": "已配置 {count} 个挂载目录",
+  "@hubSettingsHostMountsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hubSettingsHostMountsSubtitle": "将额外的手机目录映射到 Linux 容器，并加入工作区快捷选择",
+  "hubSettingsHostMountsListTitle": "已挂载目录",
+  "hubSettingsHostMountsEmpty": "还没有宿主机挂载目录",
+  "hubSettingsHostMountsEmptyHint": "添加后将映射到 /mnt/host/<名称>，可在工作区选择器中一键切换",
+  "hubSettingsHostMountsAdd": "添加宿主机目录",
+  "hubSettingsHostMountsPickFolder": "从系统选择文件夹",
+  "hubSettingsHostMountsPathLabel": "宿主机路径",
+  "hubSettingsHostMountsNameLabel": "容器内名称（可选）",
+  "hubSettingsHostMountsNameHint": "默认使用文件夹名",
+  "hubSettingsHostMountsGuestPreview": "容器内路径：{path}",
+  "@hubSettingsHostMountsGuestPreview": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "hubSettingsHostMountsInvalidPath": "请输入有效的绝对路径（不能为 /，不含冒号或 ..）",
+  "hubSettingsHostMountsInvalidName": "名称不能为空，也不能包含 /、: 或 ..",
+  "hubSettingsHostMountsDuplicate": "这个宿主机目录已经添加过了",
+  "hubSettingsHostMountsPickFailed": "无法读取所选文件夹路径，请改为手动输入路径",
+  "hubSettingsHostMountsNote": "增删挂载目录后需重启本机引擎生效；启动时不可读的目录会自动跳过，不会阻断启动。",
+  "hubSettingsHostMountsGrantStorage": "开启所有文件访问权限",
+  "hubSettingsHostMountsGrantStorageHint": "若要挂载 /sdcard 下的目录，请先授予系统文件访问权限",
   "hubSettingsVisualReplies": "可视化回复",
   "hubSettingsVisualRepliesHint": "图表、对比卡和可点的选项",
   "hubSettingsManagedAgentsMd": "注入 DSH Go 环境说明",
@@ -11409,6 +11443,7 @@
   "searchKwLanguage": "中文,英文,简体,English",
   "searchKwAutoCommands": "别问我,不要确认,自动允许,完全权限,免确认",
   "searchKwPhoneFiles": "存储,文件,相册,下载,手机存储",
+  "searchKwHostMounts": "挂载,目录,宿主机,工作区,绑定,/mnt/host",
   "searchKwVisualReplies": "图表,卡片,可视化,选项",
   "searchKwManagedAgentsMd": "AGENTS.md,提示词,环境说明,注入,人格,上下文",
   "searchKwTextSize": "字号,字体,文字大小,大字,字体大小",

@@ -11315,6 +11315,80 @@ class L10nEn extends L10n {
   String get hubSettingsPhoneFilesHint => 'AI can read and write phone storage';
 
   @override
+  String get hubSettingsHostMounts => 'Host mounted folders';
+
+  @override
+  String get hubSettingsHostMountsHint => 'Mount extra phone folders under /mnt/host/<name>';
+
+  @override
+  String hubSettingsHostMountsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count folders configured',
+      one: '1 folder configured',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hubSettingsHostMountsSubtitle =>
+      'Bind extra phone folders into the Linux guest and show them in the workspace picker';
+
+  @override
+  String get hubSettingsHostMountsListTitle => 'Mounted folders';
+
+  @override
+  String get hubSettingsHostMountsEmpty => 'No host folders mounted';
+
+  @override
+  String get hubSettingsHostMountsEmptyHint =>
+      'Added folders appear at /mnt/host/<name> and show up as shortcuts in the workspace picker';
+
+  @override
+  String get hubSettingsHostMountsAdd => 'Add host folder';
+
+  @override
+  String get hubSettingsHostMountsPickFolder => 'Pick folder from device';
+
+  @override
+  String get hubSettingsHostMountsPathLabel => 'Host path';
+
+  @override
+  String get hubSettingsHostMountsNameLabel => 'Mount name (optional)';
+
+  @override
+  String get hubSettingsHostMountsNameHint => 'Defaults to folder name';
+
+  @override
+  String hubSettingsHostMountsGuestPreview(String path) {
+    return 'Guest path: $path';
+  }
+
+  @override
+  String get hubSettingsHostMountsInvalidPath => 'Enter a valid absolute path (not /, no colons or ..)';
+
+  @override
+  String get hubSettingsHostMountsInvalidName => 'Name cannot be empty or contain /, :, or ..';
+
+  @override
+  String get hubSettingsHostMountsDuplicate => 'This host folder is already configured';
+
+  @override
+  String get hubSettingsHostMountsPickFailed =>
+      'Couldn’t resolve the picked folder path. Enter the path manually instead';
+
+  @override
+  String get hubSettingsHostMountsNote =>
+      'Changes take effect after restarting the local engine. Unreadable folders are skipped at launch without blocking startup.';
+
+  @override
+  String get hubSettingsHostMountsGrantStorage => 'Grant All files access';
+
+  @override
+  String get hubSettingsHostMountsGrantStorageHint => 'Required when mounting folders under /sdcard';
+
+  @override
   String get hubSettingsVisualReplies => 'Visual replies';
 
   @override
@@ -20231,6 +20305,9 @@ class L10nEn extends L10n {
 
   @override
   String get searchKwPhoneFiles => 'storage,files,downloads,photos';
+
+  @override
+  String get searchKwHostMounts => 'mount,mounts,host folder,bind,workspace,/mnt/host';
 
   @override
   String get searchKwVisualReplies => 'charts,cards,visual,options';

@@ -169,6 +169,7 @@ object GuestSetup {
         directEngine: Boolean = false,
         nativeLocale: String = "zh-CN",
         managedAgentsMd: Boolean = true,
+        hostMounts: List<HostMounts.Entry> = emptyList(),
     ) {
         try {
             val file = File(rootfs, "root/.dsh/AGENTS.md")
@@ -199,9 +200,17 @@ object GuestSetup {
                 }
                 directInstructions.replace("`/root/workspace`", "`${rootfs.canonicalPath}/root/workspace`") + pathNote
             } else instructions
+            val mountsNote = if (hostMounts.isEmpty()) "" else {
+                val list = hostMounts.joinToString(", ") { "`${it.guestPath}` (${it.hostPath})" }
+                if (english) " Additional host folders are mounted at: $list."
+                else {
+                    // l10n:keep agent prompt
+                    " 用户还挂载了宿主机目录：$list。"
+                }
+            }
             val text = environment.replace(
                 "{STORAGE_LINE}",
-                if (phoneStorage) {
+                (if (phoneStorage) {
                     if (english) STORAGE_GRANTED_EN else {
                         // l10n:keep agent prompt
                         "用户已授权访问手机存储：手机内部存储挂载在 `/sdcard`（`/root/手机存储` 是它的快捷方式；相册在 `/sdcard/DCIM`，下载在 `/sdcard/Download`）。改动或删除用户文件前先说明并确认；给用户的产出文件放到 `/sdcard/Download/DSH-Go/`。"
@@ -211,7 +220,7 @@ object GuestSetup {
                         // l10n:keep agent prompt
                         "手机相册、下载等用户文件不在这个环境里，看不到；如需访问，请用户在 App 设置里打开「访问手机文件」。"
                     }
-                },
+                }) + mountsNote,
             ) + (if (visualReplies) {
                 if (english) DSH_UI_SECTION_EN else DSH_UI_SECTION
             } else "") + (if (phoneControl) {

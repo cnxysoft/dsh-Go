@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/l10n.dart';
 import '../../runtime/local_paths.dart';
 import '../../state/connection_state.dart';
+import '../../state/host_mounts.dart';
 import '../../state/sessions_state.dart' show localWorkspaceDir;
 import '../../state/settings_state.dart';
 import '../../state/workspaces_state.dart';
@@ -66,8 +67,14 @@ class DirectoryShortcut {
 }
 
 /// Where to start: the home folder and the engine's default folder; on the
-/// phone also its shared storage (when the engine can see it).
-List<DirectoryShortcut> directoryShortcuts({required bool local, required bool phoneStorage, String? workingDir}) {
+/// phone also its shared storage (when the engine can see it) and any extra
+/// user-mounted host folders.
+List<DirectoryShortcut> directoryShortcuts({
+  required bool local,
+  required bool phoneStorage,
+  String? workingDir,
+  List<HostMount> hostMounts = const [],
+}) {
   if (local) {
     return [
       DirectoryShortcut(
@@ -93,6 +100,9 @@ List<DirectoryShortcut> directoryShortcuts({required bool local, required bool p
           subtitle: appL10n.remoteDirectoryDocumentsPath,
         ),
       ],
+      if (!LocalPaths.noGuest)
+        for (final mount in hostMounts)
+          DirectoryShortcut(AppIcons.files, mount.name, mount.guestPath, subtitle: mount.hostPath),
     ];
   }
   return [
@@ -117,8 +127,14 @@ class DirectoryLocationsSheet extends ConsumerWidget {
     final conn = ref.watch(activeConnectionProvider).value;
     final local = conn?.isLocal ?? true;
     final phoneStorage = ref.watch(settingsProvider.select((s) => s.phoneStorage));
+    final hostMounts = ref.watch(settingsProvider.select((s) => s.hostMounts));
     final recent = ref.watch(workspacePrefsProvider.select((p) => p.recent));
-    final shortcuts = directoryShortcuts(local: local, phoneStorage: phoneStorage, workingDir: conn?.workingDirectory);
+    final shortcuts = directoryShortcuts(
+      local: local,
+      phoneStorage: phoneStorage,
+      workingDir: conn?.workingDirectory,
+      hostMounts: hostMounts,
+    );
     final canBrowse = conn?.client.canBrowseDirectories ?? false;
     final known = {for (final s in shortcuts) ?s.path};
     final places = [

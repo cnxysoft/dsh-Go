@@ -91,7 +91,9 @@ object TawcrootLaunch {
                 val host = parts[0]
                 val guest = parts.getOrElse(1) { host }
                 val alias = host == rootfs && guest == rootfs
-                if (!alias && guest != "/sdcard" && guest != "/storage") throw Unsupported("bind")
+                if (!alias && guest != "/sdcard" && guest != "/storage" && !HostMounts.isValidGuestPath(guest)) {
+                    throw Unsupported("bind")
+                }
                 if (!guests.add(guest)) throw Unsupported("bind")
                 argv += listOf("-b", "$host:$guest")
             }

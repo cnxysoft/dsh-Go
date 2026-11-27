@@ -239,4 +239,20 @@ class GuestFilesTest {
         assertNull(resolve("/sdcard/shared"))
         assertNull(resolve("/root/shared"))
     }
+
+    @Test fun hostMountPathsResolveAndBlockTawcTokens() {
+        val mountedDir = File(root.parentFile, "extra-host").apply { mkdirs() }
+        val target = File(mountedDir, "notes/readme.md").apply {
+            parentFile.mkdirs()
+            writeText("hello mount")
+        }
+        val mounts = listOf(io.github.ccch1mneyyy.dsh_app.runtime.HostMounts.Entry("proj", mountedDir.absolutePath))
+
+        val resolved = GuestFiles.resolve(root, "/mnt/host/proj/notes/readme.md", phone.absolutePath, mounts)
+        assertEquals(target.canonicalPath, resolved?.canonicalPath)
+
+        File(objects, "789").writeText("private object")
+        Files.createSymbolicLink(File(mountedDir, "escape").toPath(), Paths.get("tawcroot:link:789"))
+        assertNull(GuestFiles.resolve(root, "/mnt/host/proj/escape", phone.absolutePath, mounts))
+    }
 }

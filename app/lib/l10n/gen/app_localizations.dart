@@ -19830,6 +19830,126 @@ abstract class L10n {
   /// **'AI 可读写手机存储'**
   String get hubSettingsPhoneFilesHint;
 
+  /// No description provided for @hubSettingsHostMounts.
+  ///
+  /// In zh, this message translates to:
+  /// **'宿主机挂载目录'**
+  String get hubSettingsHostMounts;
+
+  /// No description provided for @hubSettingsHostMountsHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'挂载多个手机目录到 /mnt/host/<名称>'**
+  String get hubSettingsHostMountsHint;
+
+  /// No description provided for @hubSettingsHostMountsCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'已配置 {count} 个挂载目录'**
+  String hubSettingsHostMountsCount(int count);
+
+  /// No description provided for @hubSettingsHostMountsSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'将额外的手机目录映射到 Linux 容器，并加入工作区快捷选择'**
+  String get hubSettingsHostMountsSubtitle;
+
+  /// No description provided for @hubSettingsHostMountsListTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'已挂载目录'**
+  String get hubSettingsHostMountsListTitle;
+
+  /// No description provided for @hubSettingsHostMountsEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有宿主机挂载目录'**
+  String get hubSettingsHostMountsEmpty;
+
+  /// No description provided for @hubSettingsHostMountsEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加后将映射到 /mnt/host/<名称>，可在工作区选择器中一键切换'**
+  String get hubSettingsHostMountsEmptyHint;
+
+  /// No description provided for @hubSettingsHostMountsAdd.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加宿主机目录'**
+  String get hubSettingsHostMountsAdd;
+
+  /// No description provided for @hubSettingsHostMountsPickFolder.
+  ///
+  /// In zh, this message translates to:
+  /// **'从系统选择文件夹'**
+  String get hubSettingsHostMountsPickFolder;
+
+  /// No description provided for @hubSettingsHostMountsPathLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'宿主机路径'**
+  String get hubSettingsHostMountsPathLabel;
+
+  /// No description provided for @hubSettingsHostMountsNameLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'容器内名称（可选）'**
+  String get hubSettingsHostMountsNameLabel;
+
+  /// No description provided for @hubSettingsHostMountsNameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认使用文件夹名'**
+  String get hubSettingsHostMountsNameHint;
+
+  /// No description provided for @hubSettingsHostMountsGuestPreview.
+  ///
+  /// In zh, this message translates to:
+  /// **'容器内路径：{path}'**
+  String hubSettingsHostMountsGuestPreview(String path);
+
+  /// No description provided for @hubSettingsHostMountsInvalidPath.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入有效的绝对路径（不能为 /，不含冒号或 ..）'**
+  String get hubSettingsHostMountsInvalidPath;
+
+  /// No description provided for @hubSettingsHostMountsInvalidName.
+  ///
+  /// In zh, this message translates to:
+  /// **'名称不能为空，也不能包含 /、: 或 ..'**
+  String get hubSettingsHostMountsInvalidName;
+
+  /// No description provided for @hubSettingsHostMountsDuplicate.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个宿主机目录已经添加过了'**
+  String get hubSettingsHostMountsDuplicate;
+
+  /// No description provided for @hubSettingsHostMountsPickFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取所选文件夹路径，请改为手动输入路径'**
+  String get hubSettingsHostMountsPickFailed;
+
+  /// No description provided for @hubSettingsHostMountsNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'增删挂载目录后需重启本机引擎生效；启动时不可读的目录会自动跳过，不会阻断启动。'**
+  String get hubSettingsHostMountsNote;
+
+  /// No description provided for @hubSettingsHostMountsGrantStorage.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启所有文件访问权限'**
+  String get hubSettingsHostMountsGrantStorage;
+
+  /// No description provided for @hubSettingsHostMountsGrantStorageHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'若要挂载 /sdcard 下的目录，请先授予系统文件访问权限'**
+  String get hubSettingsHostMountsGrantStorageHint;
+
   /// No description provided for @hubSettingsVisualReplies.
   ///
   /// In zh, this message translates to:
@@ -35243,6 +35363,12 @@ abstract class L10n {
   /// In zh, this message translates to:
   /// **'存储,文件,相册,下载,手机存储'**
   String get searchKwPhoneFiles;
+
+  /// No description provided for @searchKwHostMounts.
+  ///
+  /// In zh, this message translates to:
+  /// **'挂载,目录,宿主机,工作区,绑定,/mnt/host'**
+  String get searchKwHostMounts;
 
   /// No description provided for @searchKwVisualReplies.
   ///

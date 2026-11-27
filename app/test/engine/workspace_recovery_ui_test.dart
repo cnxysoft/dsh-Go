@@ -143,8 +143,10 @@ void main() {
 
   // The row sits near the foot of the page, below what the list builds up front.
   Future<void> toBottom(WidgetTester tester) async {
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -6000));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 3; i++) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> open(WidgetTester tester) async {
@@ -155,6 +157,7 @@ void main() {
       reason: 'installed local runtime must expose index rescue without DSH RPC',
     );
     await tester.ensureVisible(find.byKey(_tile));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(_tile));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);

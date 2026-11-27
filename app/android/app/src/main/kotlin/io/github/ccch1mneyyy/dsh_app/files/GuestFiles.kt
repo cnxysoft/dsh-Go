@@ -1,6 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.files
 
 import android.content.Context
+import io.github.ccch1mneyyy.dsh_app.runtime.HostMounts
 import io.github.ccch1mneyyy.dsh_app.runtime.PhoneStorage
 import io.github.ccch1mneyyy.dsh_app.runtime.TawcrootLinks
 import java.io.File
@@ -25,9 +26,14 @@ object GuestFiles {
 
     /** Host file for a guest or physical-rootfs [path]; null unless it is a readable regular file. */
     fun resolve(context: Context, path: String): File? =
-        resolve(rootfs(context), path, PhoneStorage.hostRoot())
+        resolve(rootfs(context), path, PhoneStorage.hostRoot(), HostMounts.read(context))
 
-    internal fun resolve(rootfs: File, path: String, phoneRoot: String): File? {
+    internal fun resolve(
+        rootfs: File,
+        path: String,
+        phoneRoot: String,
+        hostMounts: List<HostMounts.Entry> = emptyList(),
+    ): File? {
         if (!path.startsWith("/")) return null
         val rootPaths = listOf(rootfs.absolutePath, rootfs.canonicalPath)
         // Direct media results already name the physical rootfs before any symlink is followed.
@@ -42,14 +48,14 @@ object GuestFiles {
                 ".." -> { if (resolved.isNotEmpty()) resolved.removeAt(resolved.size - 1); continue }
             }
             resolved += segment
-            val host = hostOf(rootfs, resolved, phoneRoot)
+            val host = hostOf(rootfs, resolved, phoneRoot, hostMounts)
             val nio = host.toPath()
             if (!Files.isSymbolicLink(nio)) continue
             if (++links > MAX_LINKS) return null
             var target = try { Files.readSymbolicLink(nio).toString() } catch (_: Exception) { return null }
             if (target.startsWith(TawcrootLinks.PREFIX)) {
-                // Shared-storage links must not index the app's private store.
-                if (resolved.first() == PhoneStorage.GUEST_PATH.removePrefix("/") || resolved.first() == "storage") return null
+                // Shared-storage and host-mount links must not index the app's private store.
+                if (isHostBound(resolved)) return null
                 val token = target.removePrefix(TawcrootLinks.PREFIX)
                 if (!Regex("[0-9]+(-[0-9]+)?").matches(token)) return null
                 val obj = File(TawcrootLinks.storeOf(rootfs), "link/$token")
@@ -66,7 +72,10 @@ object GuestFiles {
                 if (root != null) {
                     // PRoot l2s links name the host rootfs, not another guest /data/... path.
                     target = target.removePrefix(root)
-                } else if (target.startsWith(phoneRoot)) {
+                } else if (
+                    target.startsWith(phoneRoot) ||
+                    hostMounts.any { target == it.hostPath || target.startsWith("${it.hostPath}/") }
+                ) {
                     val rest = pending.joinToString("/")
                     val file = if (rest.isEmpty()) File(target) else File(target, rest)
                     return file.takeIf { it.isFile && it.canRead() }
@@ -75,14 +84,30 @@ object GuestFiles {
             }
             segments(target).reversed().forEach { pending.addFirst(it) }
         }
-        val file = hostOf(rootfs, resolved, phoneRoot)
+        val file = hostOf(rootfs, resolved, phoneRoot, hostMounts)
         return file.takeIf { Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) && it.canRead() }
     }
 
+    private fun isHostBound(resolved: List<String>): Boolean =
+        resolved.first() == PhoneStorage.GUEST_PATH.removePrefix("/") ||
+            resolved.first() == "storage" ||
+            (resolved.size >= 2 && resolved[0] == "mnt" && resolved[1] == "host")
+
     /** Host path of resolved guest [segments] (no symlinks left to follow in them). */
-    private fun hostOf(rootfs: File, segments: List<String>, phoneRoot: String): File {
+    private fun hostOf(
+        rootfs: File,
+        segments: List<String>,
+        phoneRoot: String,
+        hostMounts: List<HostMounts.Entry>,
+    ): File {
         val guest = "/" + segments.joinToString("/")
         val phone = PhoneStorage.GUEST_PATH
+        for (mount in hostMounts) {
+            if (guest == mount.guestPath) return File(mount.hostPath)
+            if (guest.startsWith("${mount.guestPath}/")) {
+                return File(mount.hostPath + guest.removePrefix(mount.guestPath))
+            }
+        }
         return when {
             guest == phone || guest.startsWith("$phone/") -> File(phoneRoot + guest.removePrefix(phone))
             guest == "/storage" || guest.startsWith("/storage/") -> File(guest)

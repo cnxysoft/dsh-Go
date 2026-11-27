@@ -27,6 +27,7 @@ import '../theme/theme.dart';
 import '../web/local_web_screen.dart';
 import 'engine_status.dart';
 import 'engine_capabilities.dart';
+import 'host_mounts_page.dart';
 import 'linux_section.dart';
 import 'local_uninstall.dart';
 import 'reset_outcome.dart';
@@ -172,6 +173,14 @@ class EngineScreen extends ConsumerWidget {
             SettingsSection(
               title: l10n.commonMore,
               children: [
+                if (!missing && guest)
+                  SettingsTile(
+                    spot: SettingsIndex.entry(SettingsPageId.hostMounts),
+                    subtitle: settings.hostMounts.isEmpty
+                        ? l10n.hubSettingsHostMountsHint
+                        : l10n.hubSettingsHostMountsCount(settings.hostMounts.length),
+                    onTap: () => _push(context, const HostMountsPage()),
+                  ),
                 SettingsTile(
                   spot: SettingsIndex.entry(SettingsPageId.background),
                   subtitle: guest

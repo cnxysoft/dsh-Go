@@ -67,6 +67,7 @@ const _pages = {
   'page:phoneDnd',
   'page:phoneSkills',
   'page:phoneUnlocks',
+  'page:hostMounts',
 };
 const _rows = {
   'phone-a11y-restore',
@@ -146,7 +147,7 @@ void main() {
     });
 
     test('links to them are known by name', () {
-      for (final id in ['phone', 'phone-unlocks', 'phone-confirm', 'phone-files']) {
+      for (final id in ['phone', 'phone-unlocks', 'phone-confirm', 'phone-files', 'host-mounts']) {
         expect(SettingsIndex.androidOnlyLink(id), isTrue, reason: id);
       }
       for (final id in ['engine', 'appearance', 'dark-mode', 'background', 'system-permissions', 'nope']) {
