@@ -92,8 +92,10 @@ class DshProcess(
      */
     fun start(guestEnv: Map<String, String>, binds: List<String> = emptyList(), safe: Boolean = false, phone: Boolean = false, directEngine: Boolean = false, directFailed: Boolean = false, searchOverlay: Boolean = false, authOverlay: Boolean = false, speechOverlay: Boolean = false, tawcEngine: Boolean = false, tawcFailed: Boolean = false, chrootEngine: Boolean = false, chrootFailed: Boolean = false, onLaunchMethod: ((Boolean) -> Unit)? = null) {
         check(process == null) { "already started" }
-        // If a previous chroot launch left a marker behind (e.g. app killed), clean up root strays & ownership first.
-        if (File(rootfs, ChrootLaunch.PID_FILE).exists()) {
+        // If a previous chroot launch left a marker or root-owned credentials behind, clean up root strays & ownership first.
+        val needsChrootRepair = File(rootfs, ChrootLaunch.PID_FILE).exists() ||
+            File(rootfs, "root/.dsh/.credentials.yaml").let { it.exists() && !it.canRead() }
+        if (needsChrootRepair) {
             ChrootLaunch.findSu()?.let { su ->
                 val uid = AndroidProcess.myUid()
                 ChrootLaunch.stopAndCleanup(su, rootfs, uid, uid)

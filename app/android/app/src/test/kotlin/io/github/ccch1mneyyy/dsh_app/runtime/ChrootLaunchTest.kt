@@ -87,8 +87,8 @@ class ChrootLaunchTest {
     @Test fun cleanupScriptSweepsOnlyRootfsChrootProcessesAndRepairsOwnership() {
         val script = ChrootLaunch.cleanupScript(root, 10234, 10234)
         assertTrue(script.contains("ROOTFS='$root'"))
-        assertTrue(script.contains("readlink \"\$p/root\""))
-        assertTrue(script.contains("chown 10234:10234"))
+        assertTrue(script.contains("/system/bin/ls -ld /proc/[0-9]*/root"))
+        assertTrue(script.contains("-xdev -user 0 -exec /system/bin/chown -h 10234:10234"))
         assertTrue(script.contains(ChrootLaunch.PID_FILE))
     }
 }

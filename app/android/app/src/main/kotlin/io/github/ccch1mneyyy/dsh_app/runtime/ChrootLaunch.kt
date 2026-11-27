@@ -163,40 +163,41 @@ object ChrootLaunch {
     }
 
     /**
-     * Generates a root cleanup script that terminates ONLY processes whose `/proc/<pid>/root`
-     * points at [rootfs], removes stale pid markers, and restores ownership of any root-owned
-     * files under `root/`, `tmp/`, and `etc/` back to `[appUid]:[appGid]`.
+     * Generates a fast, toybox-compatible root cleanup script that terminates ONLY processes
+     * whose `/proc/<pid>/root` points at [rootfs], removes stale pid markers, and restores
+     * ownership of any root-owned files under `root/`, `tmp/`, and `etc/` back to `[appUid]:[appGid]`.
      */
     fun cleanupScript(rootfs: String, appUid: Int, appGid: Int): String {
         require(absolutePath(rootfs) && appUid >= 0 && appGid >= 0)
         val qRoot = shQuote(rootfs)
         return buildString {
             appendLine("ROOTFS=$qRoot")
-            appendLine("sweep() {")
-            appendLine("  sig=\"\$1\"; found=0")
-            appendLine("  for p in /proc/[0-9]*; do")
-            appendLine("    pid=\"\${p#/proc/}\"")
-            appendLine("    [ \"\$pid\" = \"\$\$\" ] && continue")
-            appendLine("    r=\$(readlink \"\$p/root\" 2>/dev/null || true)")
-            appendLine("    if [ \"\$r\" = \"\$ROOTFS\" ]; then")
-            appendLine("      kill -\"\$sig\" \"\$pid\" 2>/dev/null || true")
-            appendLine("      found=1")
-            appendLine("    fi")
+            appendLine("pids() {")
+            appendLine("  /system/bin/ls -ld /proc/[0-9]*/root 2>/dev/null | while IFS= read -r line; do")
+            appendLine("    case \"\$line\" in")
+            appendLine("      *\" -> \$ROOTFS\")")
+            appendLine("        rest=\"\${line#*/proc/}\"")
+            appendLine("        pid=\"\${rest%%/root*}\"")
+            appendLine("        [ \"\$pid\" != \"\$\$\" ] && echo \"\$pid\"")
+            appendLine("        ;;")
+            appendLine("    esac")
             appendLine("  done")
-            appendLine("  [ \"\$found\" -eq 1 ]")
             appendLine("}")
-            appendLine("if sweep TERM; then")
+            appendLine("list=\$(pids)")
+            appendLine("if [ -n \"\$list\" ]; then")
+            appendLine("  kill -TERM \$list 2>/dev/null || true")
             appendLine("  i=0")
             appendLine("  while [ \"\$i\" -lt 30 ]; do")
-            appendLine("    sweep 0 || break")
+            appendLine("    list=\$(pids)")
+            appendLine("    [ -z \"\$list\" ] && break")
             appendLine("    sleep 0.1")
             appendLine("    i=\$((i + 1))")
             appendLine("  done")
-            appendLine("  sweep KILL || true")
+            appendLine("  [ -n \"\$list\" ] && kill -KILL \$list 2>/dev/null || true")
             appendLine("fi")
             appendLine("rm -f \"\$ROOTFS/$PID_FILE\" \"\$ROOTFS/tmp/dsh-web.pid\" 2>/dev/null || true")
             appendLine("for d in \"\$ROOTFS/root\" \"\$ROOTFS/tmp\" \"\$ROOTFS/etc\"; do")
-            appendLine("  [ -e \"\$d\" ] && find \"\$d\" -uid 0 -exec chown $appUid:$appGid {} + 2>/dev/null || true")
+            appendLine("  [ -e \"\$d\" ] && /system/bin/find \"\$d\" -xdev -user 0 -exec /system/bin/chown -h $appUid:$appGid {} + 2>/dev/null || true")
             appendLine("done")
         }
     }

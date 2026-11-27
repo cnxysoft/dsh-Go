@@ -262,7 +262,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     @Synchronized fun setChrootEngine(enabled: Boolean) {
         check(process == null && phase !in setOf(Phase.STARTING, Phase.RUNNING, Phase.STOPPING, Phase.INSTALLING) && !resetting) { "stop the engine before changing its launch method" }
         check(!enabled || chrootEngineUnavailable() == null) { "root chroot requires su, unshare, chroot and mount" }
-        prefs.edit().putBoolean(K_CHROOT_ENGINE, enabled).remove(K_CHROOT_FAILED).apply()
+        val edit = prefs.edit().putBoolean(K_CHROOT_ENGINE, enabled).remove(K_CHROOT_FAILED)
+        if (!enabled) edit.remove(K_TAWC_FAILED)
+        edit.apply()
         emitStatus()
     }
 
