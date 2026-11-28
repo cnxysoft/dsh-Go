@@ -105,4 +105,27 @@ class PhoneFastActionsTest {
         assertTrue(PhoneFastActions.matchesWaitFor(sampleScreen, "不存在|个人中心"))
         assertFalse(PhoneFastActions.matchesWaitFor(sampleScreen, "物流详情|签收"))
     }
+
+    @Test fun openReceiptCompressesOnlyWhenFinalForegroundMatchesTargetPackage() {
+        val verbose = "已尝试打开「拼多多」（com.xunmeng.pinduoduo）。请核对实际界面。\n后续读屏未确认原处理应用位于前台；不会重复启动。"
+        val pddScreen = ScreenSnapshot("s3", sampleScreen, "拼多多", "com.xunmeng.pinduoduo")
+        val dialogScreen = ScreenSnapshot("s3", sampleScreen, "权限管理", "com.android.permissioncontroller")
+
+        assertEquals(
+            "已打开「拼多多」",
+            PhoneFastActions.openReceipt(verbose, "com.xunmeng.pinduoduo", "拼多多", pddScreen),
+        )
+        assertEquals(
+            verbose,
+            PhoneFastActions.openReceipt(verbose, "com.xunmeng.pinduoduo", "拼多多", dialogScreen),
+        )
+        assertEquals(
+            verbose,
+            PhoneFastActions.openReceipt(verbose, "com.xunmeng.pinduoduo", "拼多多", null),
+        )
+        assertEquals(
+            verbose,
+            PhoneFastActions.openReceipt(verbose, null, null, pddScreen),
+        )
+    }
 }

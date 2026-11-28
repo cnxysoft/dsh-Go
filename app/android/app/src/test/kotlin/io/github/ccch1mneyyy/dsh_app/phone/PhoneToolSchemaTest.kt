@@ -235,13 +235,32 @@ class PhoneToolSchemaTest {
             "屏幕 s3 · 拼多多 · 竖屏 · 键盘收起 · 共 2 项\n中部\n  [6] 按钮 查看物流\n  [7] 文本 快递已签收",
             "拼多多", "com.xunmeng.pinduoduo",
         )
+        val launcherPage = ScreenSnapshot(
+            "s0",
+            "屏幕 s0 · 桌面 · 竖屏 · 键盘收起 · 共 1 项\n中部\n  [1] 按钮 拼多多",
+            "桌面", "com.miui.home",
+        )
+        val dialogPage = ScreenSnapshot(
+            "s9",
+            "屏幕 s9 · 权限管理 · 竖屏 · 键盘收起 · 共 2 项\n弹窗\n  [1] 文本 允许拼多多获取通知权限？\n  [2] 按钮 允许",
+            "权限管理", "com.android.permissioncontroller",
+        )
         var current = page1
+        var nextLaunchScreen = page1
+        var promoteToPage1OnObserve = false
         val taps = mutableListOf<PhoneAction.Tap>()
         val chainDriver = object : PhoneDriver {
             override val screen = PhoneScreen.MAIN
             override fun availability() = Availability(true)
-            override fun foregroundPackage() = "com.xunmeng.pinduoduo"
-            override fun observe(detail: Boolean, image: Boolean) = current
+            override fun foregroundPackage() = current.packageName
+            override fun observe(detail: Boolean, image: Boolean): ScreenSnapshot {
+                val snap = current
+                if (promoteToPage1OnObserve && snap === launcherPage) {
+                    current = page1
+                    promoteToPage1OnObserve = false
+                }
+                return snap
+            }
             override fun collect(screenId: String, listElementId: Int, maxPages: Int, until: String?) = error("unused")
             override fun target(screenId: String, elementId: Int): TargetInfo? {
                 val label = when (screenId to elementId) {
@@ -287,8 +306,8 @@ class PhoneToolSchemaTest {
                 override fun prepareIntent(spec: IntentSpec, selectedApp: AppEntry?): Either<String, SystemLaunch> = error("unused")
                 override fun launch(plan: SystemLaunch, dispatch: PhoneTasks.SystemDispatch): SysResult {
                     check(dispatch.commitStart())
-                    current = page1
-                    return SysResult(true, "已尝试打开 拼多多", plan.target)
+                    current = nextLaunchScreen
+                    return SysResult(true, "已尝试打开 拼多多。请核对实际界面。", plan.target)
                 }
                 override fun notify(title: String, text: String) = error("unused")
                 override fun clipboardSet(text: String) = error("unused")
@@ -323,8 +342,11 @@ class PhoneToolSchemaTest {
             assertTrue(partial.text.contains("[6] 按钮 查看物流"))
             assertFalse(partial.text.contains("命中 0/"))
 
-            // open(app, then, wait_for, query) runs end-to-end in a single call.
+            // open(app, then, wait_for, query) runs end-to-end in a single call and compresses step 1
+            // once the final foreground package confirms the target app (even after a cold-start delay).
             taps.clear()
+            nextLaunchScreen = launcherPage
+            promoteToPage1OnObserve = true
             val opened = chainCore.call(PhoneToolCatalog.OPEN, mapOf(
                 "app" to "拼多多",
                 "then" to listOf("个人中心", "待收货"),
@@ -333,9 +355,27 @@ class PhoneToolSchemaTest {
             ))
             assertFalse(opened.isError)
             assertEquals(listOf(PhoneAction.Tap("s1", 3), PhoneAction.Tap("s2", 4)), taps)
-            assertTrue(opened.text.contains("连点完成（3/3 步）"))
+            assertTrue(opened.text.contains("连点完成（3/3 步）：1.✓ 已打开「拼多多」"))
+            assertFalse(opened.text.contains("未确认原处理应用位于前台"))
             assertTrue(opened.text.contains("快递已签收"))
             assertFalse(opened.text.contains("查看物流"))
+
+            // When a system/permission dialog blocks foregrounding, step 1 keeps the unconfirmed warning
+            // and returns the unfiltered dialog screen for recovery.
+            taps.clear()
+            nextLaunchScreen = dialogPage
+            promoteToPage1OnObserve = false
+            val blocked = chainCore.call(PhoneToolCatalog.OPEN, mapOf(
+                "app" to "拼多多",
+                "then" to listOf("个人中心"),
+                "query" to "签收",
+            ))
+            assertFalse(blocked.isError)
+            assertTrue(taps.isEmpty())
+            assertFalse(blocked.text.contains("1.✓ 已打开「拼多多」"))
+            assertTrue(blocked.text.contains("后续读屏未确认原处理应用位于前台"))
+            assertTrue(blocked.text.contains("2.✗ 未找到「个人中心」"))
+            assertTrue(blocked.text.contains("允许拼多多获取通知权限"))
 
             // wait_for timeout reports clearly and returns unfiltered screen.
             current = page1

@@ -54,6 +54,27 @@ internal object PhoneFastActions {
         return body.any { line -> terms.any { term -> line.contains(term, ignoreCase = true) } }
     }
 
+    /**
+     * Compresses the verbose upstream `open` receipt once the final foreground screen confirms
+     * the target package is active; keeps the full original message otherwise (e.g., blocked by
+     * a system/permission dialog or an unknown URL handler).
+     */
+    fun openReceipt(
+        originalMessage: String,
+        targetPackage: String?,
+        targetLabel: String?,
+        finalScreen: ScreenSnapshot?,
+    ): String {
+        if (!targetPackage.isNullOrBlank() && finalScreen?.packageName == targetPackage) {
+            val label = targetLabel?.takeIf { it.isNotBlank() }
+                ?: finalScreen.appLabel?.takeIf { it.isNotBlank() }
+                ?: targetPackage
+            // l10n:keep agent tool result
+            return "已打开「$label」"
+        }
+        return originalMessage
+    }
+
     fun parseThenSteps(raw: Any?): Either<String, List<String>> {
         if (raw == null) return Either.Right(emptyList())
         val list = raw as? List<*> ?: return Either.Left(

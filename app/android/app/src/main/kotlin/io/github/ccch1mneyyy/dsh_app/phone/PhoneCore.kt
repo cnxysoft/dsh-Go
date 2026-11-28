@@ -567,7 +567,7 @@ class PhoneCore(
             skillTrace.markIncomplete(owner)
             val r = launchSystem(plan, owner)
             val opened = afterSystem(owner, scope, r, summary)
-            return postOpenFastActions(opened, PhoneScreen.MAIN, thenSteps, waitFor, query, summary, scope, owner)
+            return postOpenFastActions(opened, PhoneScreen.MAIN, target?.packageName, target?.label, thenSteps, waitFor, query, summary, scope, owner)
         }
         // An explicit package is still subject to app rules even when its handler UID is unknown.
         val app = (plan.target as? SystemTarget.Known)?.app
@@ -586,7 +586,7 @@ class PhoneCore(
                 }
             } catch (e: Throwable) { skillTrace.fail(ticket); throw e }
             val opened = afterSystem(owner, scope, result, summary)
-            return postOpenFastActions(opened, PhoneScreen.MAIN, thenSteps, waitFor, query, summary, scope, owner)
+            return postOpenFastActions(opened, PhoneScreen.MAIN, app.packageName, app.label, thenSteps, waitFor, query, summary, scope, owner)
         }
         val driver = env.driver(PhoneScreen.BACKGROUND, owner)
             ?: return Out(env.backgroundUnavailable(), error = true, app = app.label, summary = ui.get("phone_log_open_background", "后台屏打开 %1\$s", app.packageName), decision = "unavailable") // l10n:keep test default
@@ -634,12 +634,14 @@ class PhoneCore(
         val openedOut = Out(res.message, error = !res.ok, screen = openedScreen, app = app.label,
             summary = bgSummary, decision = if (res.ok) decision else "failed")
         if (!res.ok || openedRefused) return openedOut
-        return postOpenFastActions(openedOut, PhoneScreen.BACKGROUND, thenSteps, waitFor, query, bgSummary, scope, owner, driver)
+        return postOpenFastActions(openedOut, PhoneScreen.BACKGROUND, app.packageName, app.label, thenSteps, waitFor, query, bgSummary, scope, owner, driver)
     }
 
     private fun postOpenFastActions(
         opened: Out,
         which: PhoneScreen,
+        targetPackage: String?,
+        targetLabel: String?,
         thenSteps: List<String>,
         waitFor: String?,
         query: String?,
@@ -657,15 +659,19 @@ class PhoneCore(
             return runTapChain(
                 driver, which, initialScreen, false, opened.text, thenSteps, waitFor, query,
                 opened.app, summary, opened.decision ?: "ok", scope, owner,
+                firstMessageForScreen = { finalScreen ->
+                    PhoneFastActions.openReceipt(opened.text, targetPackage, targetLabel, finalScreen)
+                },
             )
         }
         val waited = waitForText(driver, initialScreen, false, waitFor, owner)
         val delivered = if (waited.refused || waited.timedOut) waited.screen else waited.screen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        val receipt = PhoneFastActions.openReceipt(opened.text, targetPackage, targetLabel, if (waited.refused) null else waited.screen)
         val note = if (waited.timedOut) {
             // l10n:keep agent tool result
             "\n等待「$waitFor」超时（5 秒），返回当前屏。"
         } else ""
-        return Out(opened.text + note, error = false, screen = delivered, app = opened.app, summary = summary, decision = opened.decision)
+        return Out(receipt + note, error = false, screen = delivered, app = opened.app, summary = summary, decision = opened.decision)
     }
 
     /** The handler is a dispatch fact. Only the following read describes the actual foreground UI. */
@@ -1388,6 +1394,7 @@ class PhoneCore(
         initialDecision: String,
         scope: SerialWorker.Scope,
         owner: PhoneTasks.Owner,
+        firstMessageForScreen: ((ScreenSnapshot?) -> String)? = null,
     ): Out {
         skillTrace.markIncomplete(owner)
         var curScreen = initialScreen
@@ -1528,6 +1535,9 @@ class PhoneCore(
             waited.screen
         } else {
             waited.screen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        }
+        if (firstMessageForScreen != null) {
+            trace[0] = "1.✓ ${firstMessageForScreen(if (waited.refused) null else waited.screen)}"
         }
         // l10n:keep agent tool result
         val header = if (allCompleted) "连点完成（$done/$totalSteps 步）：" else "连点中途停止（已完成 $done/$totalSteps 步；已执行的步骤不会撤销，请勿重跑已完成步骤）："
