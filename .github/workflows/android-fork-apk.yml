@@ -2,7 +2,8 @@ name: Android fork APK
 
 on:
   push:
-    branches: [codex/android-direct-root, codex/android-dc-session-compat]
+    tags:
+      - 'apk-*'
   workflow_dispatch:
 
 permissions:
@@ -130,7 +131,9 @@ jobs:
       - name: Install the pinned NDK
         run: |
           ndk="$(jq -r .ndkVersion runtime/tawcroot/source.json)"
-          if [[ ! -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]]; then sdkmanager "ndk;$ndk"; fi
+          sdkmgr="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdkmgr" ]]; then sdkmgr=sdkmanager; fi
+          if [[ ! -f "$ANDROID_HOME/ndk/$ndk/source.properties" ]]; then "$sdkmgr" "ndk;$ndk"; fi
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ndk" >> "$GITHUB_ENV"
       - name: Configure optional fork signing
         env:
