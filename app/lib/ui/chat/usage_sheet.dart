@@ -16,9 +16,8 @@ import '../common/sheet_title_bar.dart';
 import '../theme/theme.dart';
 import 'balance_widgets.dart';
 
-/// `999` / `1K` / `43K` / `500K` / `1.05M` / `100M`: K is a thousand and M a
-/// million in every UI language (no 万/亿), the same units model context
-/// windows are quoted in.
+/// `999` / `1K` / `43K` / `500K` / `1.05M` / `12.3M` / `100M` / `3.47B`:
+/// K, M and B in every UI language (no 万/亿), matching model context units.
 String formatTokens(int n) {
   String trimZeros(String text) {
     if (!text.contains('.')) return text;
@@ -48,7 +47,27 @@ String formatTokens(int n) {
     // 999,900…999,999 would round up to 1000K: show the carry as M instead.
     if (text != '1000') return '$sign${text}K';
   }
-  return '$sign${trimZeros((value / 1000000).toStringAsFixed(2))}M';
+  if (value < 1000000000) {
+    final m = value / 1000000;
+    final text = trimZeros(
+      m >= 100
+          ? m.toStringAsFixed(0)
+          : m >= 10
+          ? m.toStringAsFixed(1)
+          : m.toStringAsFixed(2),
+    );
+    // 999,500,000+ would round up to 1000M: show the carry as B instead.
+    if (text != '1000') return '$sign${text}M';
+  }
+  final b = value / 1000000000;
+  final text = trimZeros(
+    b >= 100
+        ? b.toStringAsFixed(0)
+        : b >= 10
+        ? b.toStringAsFixed(1)
+        : b.toStringAsFixed(2),
+  );
+  return '$sign${text}B';
 }
 
 /// `12%`;大于 0 但不到 1% 时写 `<1%`。
@@ -589,9 +608,16 @@ class _Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        UsageFigure(
-          value,
-          style: theme.textTheme.titleLarge!.copyWith(fontSize: 20, height: 1.3, fontWeight: FontWeight.w500),
+        Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: UsageFigure(
+              value,
+              style: theme.textTheme.titleLarge!.copyWith(fontSize: 20, height: 1.3, fontWeight: FontWeight.w500),
+            ),
+          ),
         ),
         const SizedBox(height: 2),
         Text(label, style: theme.textTheme.bodySmall?.copyWith(color: DshColors.of(context).textTertiary)),

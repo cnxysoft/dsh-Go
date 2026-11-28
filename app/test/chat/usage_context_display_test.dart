@@ -39,4 +39,37 @@ void main() {
       expect(find.text('0 / 1K'), findsNothing);
     });
   }
+
+  testWidgets('billion-scale cumulative input formats as B and never overlaps adjacent columns', (tester) async {
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(360 * 2, 800 * 2);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      testApp(
+        const Scaffold(
+          body: SingleChildScrollView(
+            child: SessionUsageSections(
+              usage: SessionUsage(
+                uncachedInput: 138895600,
+                cacheRead: 3333494400,
+                output: 8750000,
+                turns: 3456,
+              ),
+              speed: '93',
+              sheet: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final input = find.text('3.47B');
+    final output = find.text('8.75M');
+    expect(input, findsOneWidget);
+    expect(output, findsOneWidget);
+    expect(tester.getRect(input).right, lessThanOrEqualTo(tester.getRect(output).left));
+    expect(tester.takeException(), isNull);
+  });
 }

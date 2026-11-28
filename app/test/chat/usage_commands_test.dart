@@ -215,8 +215,15 @@ void main() {
       expect(formatTokens(1000000), '1M');
       expect(formatTokens(1048576), '1.05M');
       expect(formatTokens(1050000), '1.05M');
+      expect(formatTokens(12340000), '12.3M');
       expect(formatTokens(100000000), '100M');
       expect(formatTokens(150000000), '150M');
+      expect(formatTokens(347240000), '347M');
+      expect(formatTokens(999500000), '1B'); // never 1000M
+      expect(formatTokens(1000000000), '1B');
+      expect(formatTokens(3472390000), '3.47B');
+      expect(formatTokens(12340000000), '12.3B');
+      expect(formatTokens(150400000000), '150B');
       expect(formatPercent(0.004), '<1%');
       expect(formatPercent(0), '0%');
       expect(formatPercent(0.876), '88%');
