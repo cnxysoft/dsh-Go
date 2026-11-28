@@ -219,4 +219,93 @@ class PhoneToolSchemaTest {
             IntentSpec.Navigate::class, IntentSpec.Settings::class), intents.map { it::class })
     }
 
+    @Test fun screenQueryAndTapChainFilterAndExecuteSafelyInProcess() {
+        val page1 = ScreenSnapshot(
+            "s1",
+            "屏幕 s1 · 拼多多 · 竖屏 · 键盘收起 · 共 3 项\n顶部\n  [1] 按钮 搜索\n底部\n  [2] 标签 首页   [3] 标签 个人中心",
+            "拼多多", "com.xunmeng.pinduoduo",
+        )
+        val page2 = ScreenSnapshot(
+            "s2",
+            "屏幕 s2 · 拼多多 · 竖屏 · 键盘收起 · 共 2 项\n中部\n  [4] 按钮 待收货   [5] 按钮 待评价",
+            "拼多多", "com.xunmeng.pinduoduo",
+        )
+        val page3 = ScreenSnapshot(
+            "s3",
+            "屏幕 s3 · 拼多多 · 竖屏 · 键盘收起 · 共 2 项\n中部\n  [6] 按钮 查看物流\n  [7] 文本 快递已签收",
+            "拼多多", "com.xunmeng.pinduoduo",
+        )
+        var current = page1
+        val taps = mutableListOf<PhoneAction.Tap>()
+        val chainDriver = object : PhoneDriver {
+            override val screen = PhoneScreen.MAIN
+            override fun availability() = Availability(true)
+            override fun foregroundPackage() = "com.xunmeng.pinduoduo"
+            override fun observe(detail: Boolean, image: Boolean) = current
+            override fun collect(screenId: String, listElementId: Int, maxPages: Int, until: String?) = error("unused")
+            override fun target(screenId: String, elementId: Int): TargetInfo? {
+                val label = when (screenId to elementId) {
+                    "s1" to 3 -> "个人中心"
+                    "s2" to 4 -> "待收货"
+                    else -> return null
+                }
+                return TargetInfo(screenId, elementId, "按钮", label, "com.xunmeng.pinduoduo", "拼多多", false, false, false)
+            }
+            override fun perform(action: PhoneAction): ActionResult {
+                val tap = action as PhoneAction.Tap
+                taps += tap
+                current = when (tap.screenId to tap.elementId) {
+                    "s1" to 3 -> page2
+                    "s2" to 4 -> page3
+                    else -> current
+                }
+                return ActionResult(true, "点了 ${tap.screenId}#${tap.elementId}", current)
+            }
+            override fun open(target: PhoneAppIdentity) = error("unused")
+        }
+        val chainCore = PhoneCore(object : PhoneEnv {
+            override fun enabled() = true
+            override fun policies() = PhonePolicies(confirmMode = ConfirmMode.ALWAYS)
+            override fun isLocked() = false
+            override fun a11yState() = A11yState.CONNECTED
+            override fun backgroundUnavailable() = "unavailable"
+            override fun zone() = ZoneId.of("Asia/Shanghai")
+            override fun notifyFix(kind: String) {}
+            override fun sleep(ms: Long) {}
+            override fun driver(screen: PhoneScreen) = if (screen == PhoneScreen.MAIN) chainDriver else null
+            override fun gate() = object : UserGate {
+                override fun confirm(request: ConfirmRequest) = Decision.ALLOW_APP_FOR_TASK
+                override fun handoff(reason: String, timeoutMs: Long) = error("unused")
+                override fun status(text: String?) {}
+            }
+            override fun system() = error("unused")
+        }, PhoneTasks(), ActionLog())
+        try {
+            val filtered = chainCore.call(PhoneToolCatalog.SCREEN, mapOf("query" to "个人中心"))
+            assertFalse(filtered.isError)
+            assertTrue(filtered.text.contains("[3] 标签 个人中心"))
+            assertFalse(filtered.text.contains("[1] 按钮 搜索"))
+
+            assertTrue(chainCore.call(PhoneToolCatalog.TAP, mapOf("screen" to "s1", "id" to 3, "long" to true, "then" to listOf("待收货"))).isError)
+
+            val chained = chainCore.call(PhoneToolCatalog.TAP, mapOf("screen" to "s1", "id" to 3, "then" to listOf("待收货"), "query" to "签收"))
+            assertFalse(chained.isError)
+            assertEquals(listOf(PhoneAction.Tap("s1", 3), PhoneAction.Tap("s2", 4)), taps)
+            assertTrue(chained.text.contains("连点完成（2/2 步）"))
+            assertTrue(chained.text.contains("2.✓ 点「待收货」(s2#4)"))
+            assertTrue(chained.text.contains("快递已签收"))
+            assertFalse(chained.text.contains("查看物流"))
+
+            current = page1
+            taps.clear()
+            val partial = chainCore.call(PhoneToolCatalog.TAP, mapOf("screen" to "s1", "id" to 3, "then" to listOf("待收货", "不存在")))
+            assertFalse(partial.isError)
+            assertTrue(partial.text.contains("连点中途停止（已完成 2/3 步"))
+            assertTrue(partial.text.contains("2.✓ 点「待收货」(s2#4)"))
+            assertTrue(partial.text.contains("3.✗ 未找到「不存在」"))
+        } finally {
+            chainCore.worker.shutdown()
+        }
+    }
+
 }

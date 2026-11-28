@@ -168,7 +168,7 @@ object PhoneToolCatalog {
         Tool(
             SCREEN,
             // l10n:keep agent tool catalog
-            "读当前屏幕：每行一个元素，[编号] 只在本屏有效。detail:true 附坐标，结果可能截断；image:true 请求截图，安全或能力限制时可能不附图（主屏可带编号，后台图不带编号）；background:true 读后台屏。元素少或为空不表示页面安全；本机文字识别不可用时按回话提示处理，无法核对目标就 handoff。",
+            "读当前屏幕：每行一个元素，[编号] 只在本屏有效。query 按关键词在设备侧筛选匹配项，可大幅省 token。detail:true 附坐标，结果可能截断；image:true 请求截图，安全或能力限制时可能不附图（主屏可带编号，后台图不带编号）；background:true 读后台屏。元素少或为空不表示页面安全；本机文字识别不可用时按回话提示处理，无法核对目标就 handoff。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
                 "detail" to bool("附上已返回元素的坐标，不保证完整页面"),
@@ -176,6 +176,8 @@ object PhoneToolCatalog {
                 "image" to bool("请求附带截图；可能因安全或能力限制省略"),
                 // l10n:keep agent tool catalog
                 "background" to bool("读后台屏（不打扰模式）"),
+                // l10n:keep agent tool catalog
+                "query" to str("可选：按关键词筛选本屏元素（空格或 | 分隔多个词），只返回命中项，省 token；省略读全屏"),
             ),
             emptyList(),
         ),
@@ -197,9 +199,22 @@ object PhoneToolCatalog {
         Tool(
             TAP,
             // l10n:keep agent tool catalog
-            "点一个元素，返回新屏幕。敏感按钮或首次操作该 App 会先请用户确认。",
-            // l10n:keep agent tool catalog
-            linkedMapOf("screen" to SCREEN_ID, "id" to int("元素编号"), "long" to bool("长按")),
+            "点一个元素，返回新屏幕。敏感按钮或首次操作该 App 会先请用户确认。可选 then 按文案在本机连续点 1–5 个后续目标以减少往返；可选 query 筛选最终屏幕。",
+            linkedMapOf(
+                "screen" to SCREEN_ID,
+                // l10n:keep agent tool catalog
+                "id" to int("元素编号"),
+                // l10n:keep agent tool catalog
+                "long" to bool("长按"),
+                "then" to linkedMapOf(
+                    "type" to "array",
+                    "items" to linkedMapOf("type" to "string"),
+                    // l10n:keep agent tool catalog
+                    "description" to "可选：点完 id 后在本机连续按文案点击 1–5 个后续目标（如 [\"待收货\",\"查看物流#1\"]，重名时可用 #N 选第 N 个或 #-1 选最后一个）；每步仍过安全检查，找不到、重名或遇敏感项立刻停下并返回每步 ✓/✗ 进度与当前屏；不能与 long:true 同用",
+                ),
+                // l10n:keep agent tool catalog
+                "query" to str("可选：按关键词筛选最终返回屏幕（空格或 | 分隔），省 token"),
+            ),
             listOf("screen", "id"),
         ),
         Tool(

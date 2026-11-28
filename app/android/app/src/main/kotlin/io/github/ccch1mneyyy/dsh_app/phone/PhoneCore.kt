@@ -276,7 +276,7 @@ class PhoneCore(
         if (prepared?.replay == null) rejection(name)?.let { return it }
         val remaining = remainingMs()
         val outcome = if (remaining <= 0) SerialWorker.Outcome.TimedOut(queued = true) else
-            executionWorker.run(callBudgetMs(name), remaining, owner = tasks) { scope ->
+            executionWorker.run(callBudgetMs(name, args), remaining, owner = tasks) { scope ->
                 if (remainingMs() <= 0) throw InterruptedException()
                 execute(name, args, scope, callOwner, prepared)
             }
@@ -405,10 +405,12 @@ class PhoneCore(
     private fun current(owner: PhoneTasks.Owner): Boolean =
         tasks.isCurrent(owner) && !Thread.currentThread().isInterrupted
 
-    private fun callBudgetMs(tool: String): Long =
-        if (tool == PhoneToolCatalog.ANDROID_SHELL) {
+    private fun callBudgetMs(tool: String, args: Args): Long = when (tool) {
+        PhoneToolCatalog.ANDROID_SHELL ->
             maxOf(budgetMs(tool), env.androidShellLimits().maxTimeoutMs + 15_000L).coerceAtMost(MAX_TOTAL_MS)
-        } else budgetMs(tool)
+        PhoneToolCatalog.TAP -> if (args.has("then")) 60_000L else budgetMs(tool)
+        else -> budgetMs(tool)
+    }
 
     private fun androidShell(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, localPromptMatched: Boolean): Out {
         val limits = env.androidShellLimits()
@@ -924,11 +926,12 @@ class PhoneCore(
         if (!current(owner) || !tasks.setAppIfCurrent(owner, snap.appLabel)) return stoppedOut(summary)
         val shown = returnedScreen(driver, snap, owner)
         val refused = shown !== snap
+        val delivered = if (refused) shown else PhoneFastActions.filterSnapshot(shown, a.str("query"))
         return Out(
             // l10n:keep agent tool result
             if (refused) "没有读取这个屏幕的内容。" else "",
             error = refused,
-            screen = shown,
+            screen = delivered,
             app = snap.appLabel ?: snap.packageName,
             summary = "$summary ${snap.id}",
             decision = if (refused) "refused:read" else "ok",
@@ -1105,12 +1108,23 @@ class PhoneCore(
         var typed: String? = null
         var submit = false
         var point: Pair<Int, Int>? = null
+        var thenSteps: List<String> = emptyList()
+        var query: String? = null
         var summary: String
         when (name) {
             PhoneToolCatalog.TAP -> {
                 // l10n:keep agent tool result
                 id ?: return Out("tap 需要 id（元素编号）。", error = true)
                 val long = a.bool("long") == true
+                thenSteps = when (val parsed = PhoneFastActions.parseThenSteps(a.raw("then"))) {
+                    is Either.Left -> return Out(parsed.value, error = true)
+                    is Either.Right -> parsed.value
+                }
+                if (long && thenSteps.isNotEmpty()) {
+                    // l10n:keep agent tool result
+                    return Out("long:true 不能与 then 联用。", error = true)
+                }
+                query = a.str("query")
                 action = PhoneAction.Tap(sid, id, long)
                 kind = if (long) WriteKind.LONG_TAP else WriteKind.TAP
                 summary = if (long) ui.get("phone_log_long_tap", "长按 %1\$s#%2\$d", sid.toString(), id) else ui.get("phone_log_tap", "点 %1\$s#%2\$d", sid.toString(), id) // l10n:keep test default
@@ -1244,13 +1258,174 @@ class PhoneCore(
             } ?: result
         }
         if (!res.ok && res.staleSnapshot) return stale(driver, sid, summary, owner, res.message)
+        val firstScreen = res.screen?.let { returnedScreen(driver, it, owner) }
+        val firstRefused = res.screen != null && firstScreen !== res.screen
+        if (res.ok && thenSteps.isNotEmpty()) {
+            return runTapChain(driver, which, firstScreen, firstRefused, res.message, thenSteps, query, app, summary, decision, scope, owner)
+        }
+        val finalScreen = if (firstRefused) firstScreen else firstScreen?.let { PhoneFastActions.filterSnapshot(it, query) }
         return Out(
             res.message,
             error = !res.ok,
-            screen = res.screen?.let { returnedScreen(driver, it, owner) },
+            screen = finalScreen,
             app = app,
             summary = summary,
             decision = if (res.ok) decision else policyFailure.get()?.decision ?: "failed",
+        )
+    }
+
+    /** Executes follow-up text-matched taps in-process while preserving every safety and read gate. */
+    private fun runTapChain(
+        driver: PhoneDriver,
+        which: PhoneScreen,
+        initialScreen: ScreenSnapshot?,
+        initialRefused: Boolean,
+        firstMessage: String,
+        thenSteps: List<String>,
+        query: String?,
+        initialApp: String?,
+        summary: String,
+        initialDecision: String,
+        scope: SerialWorker.Scope,
+        owner: PhoneTasks.Owner,
+    ): Out {
+        skillTrace.markIncomplete(owner)
+        var curScreen = initialScreen
+        var curRefused = initialRefused
+        var lastApp = initialApp
+        val totalSteps = 1 + thenSteps.size
+        var done = 1
+        val trace = mutableListOf("1.✓ $firstMessage")
+
+        for ((index, stepLabel) in thenSteps.withIndex()) {
+            val stepNo = index + 2
+            if (!current(owner)) return stoppedOut(summary)
+            if (env.isLocked()) {
+                // l10n:keep agent tool result
+                trace += "$stepNo.✗ 手机已锁屏，未点「$stepLabel」"
+                break
+            }
+            if (curScreen == null || curRefused || curScreen.secure) {
+                // l10n:keep agent tool result
+                trace += "$stepNo.✗ 当前屏不可读，未点「$stepLabel」"
+                break
+            }
+            var match = PhoneFastActions.findElementByText(curScreen.text, stepLabel)
+            var retries = 0
+            while (match is PhoneFastActions.MatchResult.NotFound && retries < PhoneFastActions.CHAIN_RETRY_COUNT) {
+                retries++
+                env.sleep(PhoneFastActions.CHAIN_RETRY_DELAY_MS)
+                if (!current(owner)) return stoppedOut(summary)
+                if (env.isLocked()) break
+                val obs = driver.observe(detail = false, image = false)
+                val shown = returnedScreen(driver, obs, owner)
+                curScreen = shown
+                curRefused = shown !== obs
+                if (curRefused || shown.secure) break
+                match = PhoneFastActions.findElementByText(shown.text, stepLabel)
+            }
+            if (env.isLocked()) {
+                // l10n:keep agent tool result
+                trace += "$stepNo.✗ 手机已锁屏，未点「$stepLabel」"
+                break
+            }
+            if (curScreen == null || curRefused || curScreen.secure) {
+                // l10n:keep agent tool result
+                trace += "$stepNo.✗ 当前屏不可读，未点「$stepLabel」"
+                break
+            }
+            when (val resolved = match) {
+                PhoneFastActions.MatchResult.NotFound -> {
+                    // l10n:keep agent tool result
+                    trace += "$stepNo.✗ 未找到「$stepLabel」，已停在当前屏"
+                    break
+                }
+                is PhoneFastActions.MatchResult.Ambiguous -> {
+                    val opts = resolved.candidates.take(4).joinToString("、") { "[${it.id}] ${it.label}" }
+                    // l10n:keep agent tool result
+                    trace += "$stepNo.✗ 「$stepLabel」匹配到多处（$opts），可用「$stepLabel#1」或按编号点击"
+                    break
+                }
+                is PhoneFastActions.MatchResult.Found -> {
+                    val snap = curScreen
+                    val elem = resolved.element
+                    val nextTarget = driver.target(snap.id, elem.id)
+                    if (nextTarget == null) {
+                        // l10n:keep agent tool result
+                        trace += "$stepNo.✗ 页面已变化，未点「$stepLabel」"
+                        break
+                    }
+                    val nextPkg = nextTarget.packageName ?: driver.foregroundPackage()
+                    val nextAppLabel = nextTarget.appLabel
+                    lastApp = nextAppLabel ?: nextPkg ?: lastApp
+                    fun nextVerdict() = safety.checkWrite(WriteKind.TAP, nextTarget, nextPkg, nextAppLabel, null, false, null, null, which, null)
+                    val verdict = nextVerdict()
+                    val stepConfirmed = verdict is SafetyGate.Verdict.Confirm
+                    when (val gateRes = safety.resolve(verdict, scope, owner)) {
+                        is SafetyGate.Result.No -> {
+                            // l10n:keep agent tool result
+                            trace += "$stepNo.✗ 「$stepLabel」未获准执行：${gateRes.message}"
+                            break
+                        }
+                        is SafetyGate.Result.Go -> Unit
+                    }
+                    val stepFailure = AtomicReference<SafetyGate.Result.No?>(null)
+                    fun stepPolicyAllowed(): Boolean {
+                        if (stepFailure.get() != null) return false
+                        val refusal = when (val latest = nextVerdict()) {
+                            is SafetyGate.Verdict.Refuse -> SafetyGate.Result.No(latest.message, "refused:${latest.rule}")
+                            is SafetyGate.Verdict.Confirm -> if (stepConfirmed) null else SafetyGate.Result.No(
+                                "手机操作策略已变化，本次原授权不足。请重新观察并征得用户确认，不要自动重试。", "refused:policy-changed") // l10n:keep agent safety result
+                            SafetyGate.Verdict.Allow -> null
+                        }
+                        if (refusal != null) stepFailure.compareAndSet(null, refusal)
+                        return stepFailure.get() == null
+                    }
+                    if (!stepPolicyAllowed()) {
+                        trace += "$stepNo.✗ ${checkNotNull(stepFailure.get()).message}"
+                        break
+                    }
+                    if (!current(owner) || !tasks.setAppIfCurrent(owner, lastApp)) return stoppedOut(summary)
+                    say(owner, ui.get("phone_acting", "DSH 正在操作 · %1\$s", statusLine(WriteKind.TAP, nextTarget, null))) // l10n:keep test default
+                    fun stepSourcesAllowed(sources: Set<String>): Boolean {
+                        if (stepFailure.get() != null) return false
+                        val packages = buildSet { nextPkg?.let(::add); addAll(sources) }
+                        val refusal = safety.checkReadSources(env.policies(), packages)
+                        if (refusal != null) stepFailure.compareAndSet(null, SafetyGate.Result.No(refusal.message, "refused:${refusal.rule}"))
+                        return stepFailure.get() == null
+                    }
+                    val stepRes = driver.perform(PhoneAction.Tap(snap.id, elem.id, long = false), ::stepPolicyAllowed, null, ::stepSourcesAllowed)
+                    val nextScreen = stepRes.screen?.let { returnedScreen(driver, it, owner) }
+                    curRefused = stepRes.screen != null && nextScreen !== stepRes.screen
+                    curScreen = nextScreen ?: curScreen
+                    val failedPolicy = stepFailure.get()
+                    if (failedPolicy != null) {
+                        trace += "$stepNo.✗ ${failedPolicy.message}"
+                        break
+                    }
+                    if (!stepRes.ok) {
+                        // l10n:keep agent tool result
+                        trace += "$stepNo.✗ 点「${elem.label}」未完成：${stepRes.message}"
+                        break
+                    }
+                    done++
+                    // l10n:keep agent tool result
+                    trace += "$stepNo.✓ 点「${elem.label}」(${snap.id}#${elem.id})"
+                }
+            }
+        }
+
+        val finalScreen = if (curRefused) curScreen else curScreen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        // l10n:keep agent tool result
+        val header = if (done == totalSteps) "连点完成（$done/$totalSteps 步）：" else "连点中途停止（已完成 $done/$totalSteps 步，已完成步骤勿重放）："
+        return Out(
+            header + trace.joinToString(" → "),
+            error = false,
+            screen = finalScreen,
+            app = lastApp,
+            // l10n:keep test default
+            summary = if (done > 1) "$summary（连点 $done 步）" else summary,
+            decision = initialDecision,
         )
     }
 
