@@ -1,0 +1,321 @@
+# WeakMap/WeakSet caching for frozen long-session history across pi-ai and DeepSeek adapters.
+--- a/node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js
+@@ -1606,9 +1606,20 @@
+ 	}
+ 	return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
+ }
++const __dshDeepSeekAssistantCache = /* @__PURE__ */ new WeakMap();
++const __dshDeepSeekTextInputCache = /* @__PURE__ */ new WeakMap();
+ function assistant(message, model, onReplayDegrade) {
+-	const replay = readReplay(message, model, onReplayDegrade);
+-	return message.content.flatMap((block, index) => {
++	const frozen = Object.isFrozen(message);
++	if (frozen) {
++		const cached = __dshDeepSeekAssistantCache.get(message);
++		if (cached !== void 0 && cached.model === model) return cached.blocks.slice();
++	}
++	let degraded = false;
++	const replay = readReplay(message, model, (reason) => {
++		degraded = true;
++		onReplayDegrade?.(reason);
++	});
++	const blocks = message.content.flatMap((block, index) => {
+ 		switch (block.type) {
+ 			case "text": return block.text.length === 0 ? [] : {
+ 				type: "text",
+@@ -1628,6 +1639,12 @@
+ 			default: return unsupported(`assistant content ${block.type}`);
+ 		}
+ 	});
++	if (frozen && !degraded) {
++		Object.freeze(blocks);
++		__dshDeepSeekAssistantCache.set(message, { model, blocks });
++		return blocks.slice();
++	}
++	return blocks;
+ }
+ /** Serialize one complete request using already prepared image bytes.
+ * User and tool-result content omits reasoning and tool-call blocks.
+@@ -1648,35 +1665,47 @@
+ function serialize(options, connection, history, images, access, onReplayDegrade, fileIds) {
+ 	const model = connection.models.find((entry) => entry.id === options.model);
+ 	const inHistory = model?.systemPromptUpdate === "in-history";
+-	const input = (blocks) => blocks.flatMap((block) => {
+-		if (block.type === "text") return block.text ? [{
+-			type: "text",
+-			text: block.text
+-		}] : [];
+-		if (block.type === "reasoning" || block.type === "tool-call") return [];
+-		if (block.type !== "image") return unsupported(`user/tool-result content ${block.type}`);
+-		const version = images.get(block.attachment.attachmentId);
+-		if (version === void 0) throw new LlmError("DeepSeek Messages request image is missing", "INVALID_REQUEST");
+-		const fileId = fileIds?.get(block.attachment.attachmentId);
+-		if (fileIds !== void 0 && fileId === void 0) throw new LlmError("DeepSeek Messages request file id is missing", "INVALID_REQUEST");
+-		return [{
+-			type: "text",
+-			text: requestImageHandleText(block.attachment, version, access(block.attachment))
+-		}, fileId === void 0 ? {
+-			type: "image",
+-			source: {
+-				type: "base64",
+-				media_type: version.mediaType,
+-				data: Buffer.from(version.data).toString("base64")
+-			}
+-		} : {
+-			type: "image",
+-			source: {
+-				type: "file",
+-				file_id: fileId
+-			}
+-		}];
+-	});
++	const input = (blocks) => {
++		const cached = __dshDeepSeekTextInputCache.get(blocks);
++		if (cached !== void 0) return cached.slice();
++		let hasImage = false;
++		const out = blocks.flatMap((block) => {
++			if (block.type === "text") return block.text ? [{
++				type: "text",
++				text: block.text
++			}] : [];
++			if (block.type === "reasoning" || block.type === "tool-call") return [];
++			if (block.type !== "image") return unsupported(`user/tool-result content ${block.type}`);
++			hasImage = true;
++			const version = images.get(block.attachment.attachmentId);
++			if (version === void 0) throw new LlmError("DeepSeek Messages request image is missing", "INVALID_REQUEST");
++			const fileId = fileIds?.get(block.attachment.attachmentId);
++			if (fileIds !== void 0 && fileId === void 0) throw new LlmError("DeepSeek Messages request file id is missing", "INVALID_REQUEST");
++			return [{
++				type: "text",
++				text: requestImageHandleText(block.attachment, version, access(block.attachment))
++			}, fileId === void 0 ? {
++				type: "image",
++				source: {
++					type: "base64",
++					media_type: version.mediaType,
++					data: Buffer.from(version.data).toString("base64")
++				}
++			} : {
++				type: "image",
++				source: {
++					type: "file",
++					file_id: fileId
++				}
++			}];
++		});
++		if (!hasImage && Object.isFrozen(blocks)) {
++			Object.freeze(out);
++			__dshDeepSeekTextInputCache.set(blocks, out);
++			return out.slice();
++		}
++		return out;
++	};
+ 	const messages = [];
+ 	let historySystem;
+ 	const systemUpdates = [];
+@@ -1738,7 +1767,7 @@
+ 			tool_use_id: message.toolCallId,
+ 			content: input(message.content),
+ 			...message.isError === void 0 ? {} : { is_error: message.isError }
+-		}] : message.content.flatMap((block) => input([block]));
++		}] : input(message.content);
+ 		if ((message.role === "user" || message.role === "assistant") && content.length === 0) continue;
+ 		if (message.role === "assistant") flushSystemUpdates();
+ 		const wireRole = message.role === "tool" ? "user" : message.role;
+--- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
+@@ -240,11 +240,33 @@
+ *   state falls back to provider-neutral conversion.
+ * @returns a native pi-ai assistant message reconstructed from durable content.
+ */
++const __dshPiAssistantCache = /* @__PURE__ */ new WeakMap();
++const __dshValidHistoryCache = /* @__PURE__ */ new WeakSet();
++const __dshPlainUserContentCache = /* @__PURE__ */ new WeakMap();
+ function toPiAssistant(message, onDegrade) {
++	const frozen = Object.isFrozen(message);
++	if (frozen) {
++		const cached = __dshPiAssistantCache.get(message);
++		if (cached !== void 0) return cached;
++	}
+ 	const source = message.source;
+-	if (source.replayState === void 0) return foreignAssistant(message);
++	if (source.replayState === void 0) {
++		const assistant = foreignAssistant(message);
++		if (frozen) {
++			Object.freeze(assistant.content);
++			Object.freeze(assistant);
++			__dshPiAssistantCache.set(message, assistant);
++		}
++		return assistant;
++	}
+ 	try {
+-		return replayedAssistant(message, source, source.replayState);
++		const assistant = replayedAssistant(message, source, source.replayState);
++		if (frozen) {
++			Object.freeze(assistant.content);
++			Object.freeze(assistant);
++			__dshPiAssistantCache.set(message, assistant);
++		}
++		return assistant;
+ 	} catch (error) {
+ 		/* v8 ignore next -- replayedAssistant throws only INVALID_REPLAY_STATE LlmErrors; the
+ 		guard keeps a future non-replay failure loud instead of silently degrading it */
+@@ -1211,12 +1233,16 @@
+ /** Reject misplaced tool-change blocks and unsupported image roles before replay or image offloading. */
+ function assertSupportedHistory(messages) {
+ 	for (const message of messages) {
++		if (__dshValidHistoryCache.has(message)) continue;
+ 		if (message.role !== "developer" && message.content.some((block) => block.type === "tool-addition" || block.type === "tool-removal")) throw new LlmError("Tool-change blocks require developer role", "UNSUPPORTED_CONTENT");
+ 		if (message.role !== "user" && message.role !== "tool" && contentHasImage(message.content)) throw new LlmError(`pi-ai cannot represent an image in an in-history ${message.role} message`, "UNSUPPORTED_CONTENT");
+ 		if (message.role === "system" && message.content.some((block) => block.type !== "text")) throw new LlmError("pi-ai cannot represent non-text system messages", "UNSUPPORTED_CONTENT");
++		if (Object.isFrozen(message)) __dshValidHistoryCache.add(message);
+ 	}
+ }
+ function userContent(blocks, requestImages, resolveImageAccess) {
++	const cachedText = __dshPlainUserContentCache.get(blocks);
++	if (cachedText !== void 0) return cachedText;
+ 	const content = [];
+ 	for (const block of blocks) switch (block.type) {
+ 		case "text":
+@@ -1240,7 +1266,11 @@
+ 		}
+ 		default: break;
+ 	}
+-	if (content.every((block) => block.type === "text")) return content.map((block) => block.text).join("");
++	if (content.every((block) => block.type === "text")) {
++		const joined = content.map((block) => block.text).join("");
++		if (Object.isFrozen(blocks)) __dshPlainUserContentCache.set(blocks, joined);
++		return joined;
++	}
+ 	return content;
+ }
+ function collectImageRefs(blocks, refs) {
+--- a/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js
++++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js
+@@ -34,7 +34,12 @@
+     }
+     return { id: signature };
+ }
++const __dshResponsesAsstCache = new WeakMap();
+ function convertToolResultOutput(model, content) {
++    if (content.length === 1 && content[0].type === "text") {
++        const singleText = content[0].text;
++        return sanitizeSurrogates(singleText.trim().length > 0 ? singleText : "(no tool output)");
++    }
+     const textResult = content
+         .filter((c) => c.type === "text")
+         .map((c) => c.text)
+@@ -225,11 +230,29 @@
+             }
+         }
+         else if (msg.role === "assistant") {
+-            const output = [];
+             const assistantMsg = msg;
+             const isSameProviderAndApi = assistantMsg.provider === model.provider && assistantMsg.api === model.api;
+             const isSameModel = isSameProviderAndApi && assistantMsg.model === model.id;
+             const isDifferentModel = isSameProviderAndApi && assistantMsg.model !== model.id;
++            const hasGrammar = (options?.grammarToolInputProperties?.size ?? 0) > 0;
++            const cacheKey = hasGrammar || !Object.isFrozen(assistantMsg) ? null : `${model.provider}\0${model.api}\0${model.id}`;
++            const cachedAsst = cacheKey !== null ? __dshResponsesAsstCache.get(assistantMsg) : undefined;
++            if (cachedAsst !== undefined && cachedAsst.key === cacheKey) {
++                if (cachedAsst.items.length === 0)
++                    continue;
++                if (options?.configurationUpdateEffort !== undefined &&
++                    isSameModel &&
++                    msg.providerThinkingLevel !== undefined) {
++                    pushConfigurationUpdate(msg.providerThinkingLevel);
++                }
++                for (let ci = 0; ci < cachedAsst.items.length; ci++)
++                    messages.push(cachedAsst.items[ci]);
++                if (!isLeadingSystemMessage)
++                    msgIndex++;
++                continue;
++            }
++            const output = [];
++            let usedFallbackId = false;
+             let textBlockIndex = 0;
+             for (const block of msg.content) {
+                 if (block.type === "thinking") {
+@@ -247,6 +270,7 @@
+                     let msgId = parsedSignature?.id;
+                     if (!msgId) {
+                         msgId = fallbackMessageId;
++                        usedFallbackId = true;
+                     }
+                     else if (msgId.length > 64) {
+                         msgId = `msg_${shortHash(msgId)}`;
+@@ -297,6 +321,21 @@
+                     }
+                 }
+             }
++            if (cacheKey !== null && !usedFallbackId) {
++                __dshResponsesAsstCache.set(assistantMsg, { key: cacheKey, items: output });
++                if (output.length === 0)
++                    continue;
++                if (options?.configurationUpdateEffort !== undefined &&
++                    isSameModel &&
++                    msg.providerThinkingLevel !== undefined) {
++                    pushConfigurationUpdate(msg.providerThinkingLevel);
++                }
++                for (let ci = 0; ci < output.length; ci++)
++                    messages.push(output[ci]);
++                if (!isLeadingSystemMessage)
++                    msgIndex++;
++                continue;
++            }
+             if (output.length === 0)
+                 continue;
+             if (options?.configurationUpdateEffort !== undefined &&
+--- a/node_modules/@earendil-works/pi-ai/dist/api/transform-messages.js
++++ b/node_modules/@earendil-works/pi-ai/dist/api/transform-messages.js
+@@ -60,6 +60,7 @@
+  * OpenAI Responses API generates IDs that are 450+ chars with special characters like `|`.
+  * Anthropic APIs require IDs matching ^[a-zA-Z0-9_-]+$ (max 64 chars).
+  */
++const __dshTransformSameModelPass = new WeakSet();
+ export function transformMessages(messages, model, normalizeToolCallId) {
+     // Build a map of original tool call IDs to normalized IDs
+     const toolCallIdMap = new Map();
+@@ -87,6 +88,9 @@
+             const isSameModel = assistantMsg.provider === model.provider &&
+                 assistantMsg.api === model.api &&
+                 assistantMsg.model === model.id;
++            if (isSameModel && __dshTransformSameModelPass.has(assistantMsg)) {
++                return assistantMsg;
++            }
+             const transformedContent = assistantMsg.content.flatMap((block) => {
+                 if (block.type === "thinking") {
+                     // Thinking from another model is dropped. Signatures and encrypted reasoning are
+@@ -128,6 +132,20 @@
+                 }
+                 return block;
+             });
++            if (transformedContent.length === assistantMsg.content.length) {
++                let same = true;
++                for (let k = 0; k < transformedContent.length; k++) {
++                    if (transformedContent[k] !== assistantMsg.content[k]) {
++                        same = false;
++                        break;
++                    }
++                }
++                if (same) {
++                    if (isSameModel && Object.isFrozen(assistantMsg))
++                        __dshTransformSameModelPass.add(assistantMsg);
++                    return assistantMsg;
++                }
++            }
+             return {
+                 ...assistantMsg,
+                 content: transformedContent,
+--- a/node_modules/@earendil-works/pi-ai/dist/utils/sanitize-unicode.js
++++ b/node_modules/@earendil-works/pi-ai/dist/utils/sanitize-unicode.js
+@@ -19,6 +19,8 @@
+  * sanitizeSurrogates(`Text ${unpaired} here`) // => "Text  here"
+  */
+ export function sanitizeSurrogates(text) {
++    if (typeof text.isWellFormed === "function" && text.isWellFormed())
++        return text;
+     // Replace unpaired high surrogates (0xD800-0xDBFF not followed by low surrogate)
+     // Replace unpaired low surrogates (0xDC00-0xDFFF not preceded by high surrogate)
+     return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");

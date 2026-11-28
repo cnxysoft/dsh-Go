@@ -32,10 +32,11 @@
 - **安全回执与未过滤恢复屏**：`then` 中途停止或 `wait_for` 超时时，强制原样返回**未过滤**的当前屏，避免确认/弹窗按钮被终点 `query` 筛掉；中途停止回执逐条列出 `1.✓ / 2.✗` 并明确提示「已执行的步骤不会撤销，请勿重跑已完成步骤」。
 - **`open` 回执收口**：最终前台包名确认命中目标包名时，将第 1 步精简为 `已打开「<应用名>」`；若被权限弹窗或系统拦截导致包名不符，保留上游原提示以便排查。
 
-### 4. Android DSH 运行时兼容与模型请求图片压缩
-两项仅作用于 Android 运行时的补丁（不改动鸿蒙运行时）：
+### 4. Android DSH 运行时兼容、模型请求图片压缩与长会话提速
+仅作用于 Android 运行时的补丁（不改动鸿蒙运行时）：
 - **`0.2.2-rc.3` 历史会话事件向下兼容（`android-session-team-mode.diff`）**：在内置 DSH `0.2.2-rc.1` 的会话恢复白名单中识别 `0.2.2-rc.3` 写入的 `team/mode`（智能体团队开关）只读日志事件，使从 `rc.3` 迁移的历史会话可以正常加载恢复（不启用团队模式功能，也不允许写入新事件）。
 - **模型请求图片压缩规格收紧（`android-request-preview.diff`）**：将 Android 发给大模型的请求图片长边上限从 `4096px` 压至 `1600px`、单图体积上限压至 `<= 1 MB`，并去掉小图直传分支统一走编码压缩阶梯（`request-image-android-p1`），降低传图体积与失败率。
+- **长会话历史转换缓存与首字加速（`android-long-session-history-cache.diff`）**：对深度冻结的历史消息在 `dsh-llm-pi-ai`、`@earendil-works/pi-ai`（`sanitize-unicode` `isWellFormed()` 快路径、`transform-messages`、`openai-responses-shared`）与 `dsh-llm-deepseek` 中引入 `WeakMap`/`WeakSet` 缓存，避免长会话每轮全量重跑校验、`JSON.parse`/`stringify` 与孤立代理项正则扫描，保持线缆字节完全一致并降低长会话 TTFT。
 
 ### 5. 界面与用量统计修复
 - 修复十亿级 token 计数显示溢出：`1M–9.99M` 保留 2 位小数、`10M–99.9M` 保留 1 位小数、`100M–999M` 取整、`>= 1000M` 格式化为 `B`（如 `3.47B`）。
@@ -52,6 +53,9 @@
 ---
 
 ## 变更日志
+
+### 2026-11-29
+- **`android-long-session-history-cache.diff`** — 为 `dsh-llm-pi-ai`、`@earendil-works/pi-ai`（`sanitize-unicode`、`transform-messages`、`openai-responses-shared`）与 `dsh-llm-deepseek` 增加冻结长会话历史 `WeakMap`/`WeakSet` 缓存与 `isWellFormed()` 快路径，补齐 `android-long-session-history-cache.test.mjs` 单测，提升长会话首字输出速度。
 
 ### 2026-11-28
 - **`ed3c275c7`** — `open` 结合 `then` / `wait_for` / `query` 时，若最终前台包名等于目标包名则将第 1 步回执精简为 `已打开「…」`，被弹窗或系统拦住时保留上游未确认提示；补充单元与端到端测试。

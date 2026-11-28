@@ -1,5 +1,29 @@
 {
   "patches": {
+    "android-long-session-history-cache.diff": {
+      "0.2.2-rc.1": {
+        "node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js": {
+          "after": "a4a8c45b2eff368403f54d7d5bfec0dbcaf3e0b986664f6c22092ec64d0fb3c1",
+          "before": "048cfbcac530951c038d071ff21a9e1b9fe8611606aef8ccbe344c2b9491e309"
+        },
+        "node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js": {
+          "after": "012ab6f8d7ff0eb5dad7d838fd520d235ada0aa566cf743c6720a23ef849c374",
+          "before": "2bcd47623eac9a43c422e4686d58d71f30ff54d20e47670513a5211db6b5ae6b"
+        },
+        "node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js": {
+          "after": "a0bfb128f42464ace6fda784d2ce15a7aee57bab301355fa5540b24624c2aeb9",
+          "before": "00796997da00cd4cb77ae8c1c4bb92a3d4a4a4dd5bea18524de7173e4f877e4c"
+        },
+        "node_modules/@earendil-works/pi-ai/dist/api/transform-messages.js": {
+          "after": "dddc0a7dfc34554c1d0cf91e7e0a94a83aff233284bf041bb3a5b5d7e5a75fb9",
+          "before": "5654d81fdacdf3f3e9ca9eb89c4dfa71b742b852163ecd49ba38307f876db63e"
+        },
+        "node_modules/@earendil-works/pi-ai/dist/utils/sanitize-unicode.js": {
+          "after": "ec7b57833c32b36a12faed555982feb46e0f83d52b3aa0833dc258eb5ebb808b",
+          "before": "77cb844b43f502cc24b25ef284ec5a6f6ac375ac994bcf688275848e1475bc80"
+        }
+      }
+    },
     "android-phone-prompt-correlation.diff": {
       "0.2.2-rc.1": {
         "node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js": {
@@ -3257,7 +3281,8 @@
       "brotli-packed-dictionary.diff",
       "android-session-team-mode.diff",
       "android-request-preview.diff",
-      "android-phone-prompt-correlation.diff"
+      "android-phone-prompt-correlation.diff",
+      "android-long-session-history-cache.diff"
     ],
     "ohos": [
       "cordis-effect-dispose-completion.diff",

@@ -234,6 +234,7 @@ brotli-packed-dictionary.diff
 android-session-team-mode.diff
 android-request-preview.diff
 android-phone-prompt-correlation.diff
+android-long-session-history-cache.diff
 # HarmonyOS-only overlays (pins.json targetSets.ohos), after the whole common chain.
 ohos-attachment-publication.diff
 ohos-attachment-diagnostic.diff

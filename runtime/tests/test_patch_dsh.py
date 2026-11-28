@@ -385,9 +385,10 @@ class PatchDsh(unittest.TestCase):
         pins = load(os.path.join(shipped, "pins.json"))
         android, _ = rtbuild.select_dsh_patches(pins, shipped, "android")
         ohos, everything = rtbuild.select_dsh_patches(pins, shipped, "ohos")
-        # Android compatibility and native phone attribution must not change the OHOS runtime.
+        # Android compatibility, native phone attribution, and long-session cache must not change the OHOS runtime.
         android_only = ["android-session-team-mode.diff", "android-request-preview.diff",
-                        "android-phone-prompt-correlation.diff"]
+                        "android-phone-prompt-correlation.diff",
+                        "android-long-session-history-cache.diff"]
         self.assertEqual([name for name in android if name not in ohos], android_only)
         shared = [name for name in android if name not in android_only]
         self.assertEqual(ohos[:len(shared)], shared)
