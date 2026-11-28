@@ -2,6 +2,9 @@
   <b>简体中文</b> · <a href="README.en.md">English</a>
 </p>
 
+> **Fork 说明（`cnxysoft/dsh-Go` · `codex/android-dc-session-compat`）**
+> 本分支基于上游 [`ccch1mneyyy/dsh-Go`](https://github.com/ccch1mneyyy/dsh-Go)（当前基线 `v1.4.1`）维护，新增 Android Shell 直连 Root（可调限额 / 4 档审批 / 锁屏续跑）、实验性原生 Root `chroot` 后端与多目录挂载、DeepCode 历史会话兼容、手机操控 `query / then / wait_for` 提速与十亿级用量格式化等特性。完整改动清单与变更日志见 [**FORK_CHANGELOG.md**](FORK_CHANGELOG.md)。
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-zh-dark.webp">
