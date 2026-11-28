@@ -98,4 +98,11 @@ class PhoneFastActionsTest {
         assertTrue(PhoneFastActions.parseThenSteps(listOf("   ")) is Either.Left)
         assertTrue(PhoneFastActions.parseThenSteps(listOf("a".repeat(61))) is Either.Left)
     }
+
+    @Test fun matchesWaitForChecksBodyLinesAndIgnoresHeaderAppName() {
+        assertFalse(PhoneFastActions.matchesWaitFor(sampleScreen, "拼多多"))
+        assertTrue(PhoneFastActions.matchesWaitFor(sampleScreen, "查看物流"))
+        assertTrue(PhoneFastActions.matchesWaitFor(sampleScreen, "不存在|个人中心"))
+        assertFalse(PhoneFastActions.matchesWaitFor(sampleScreen, "物流详情|签收"))
+    }
 }

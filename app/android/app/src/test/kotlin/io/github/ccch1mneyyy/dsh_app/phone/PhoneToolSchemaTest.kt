@@ -278,7 +278,23 @@ class PhoneToolSchemaTest {
                 override fun handoff(reason: String, timeoutMs: Long) = error("unused")
                 override fun status(text: String?) {}
             }
-            override fun system() = error("unused")
+            override fun system() = object : SystemApi {
+                private val pdd = AppEntry("拼多多", PhoneAppIdentity("com.xunmeng.pinduoduo", 10123))
+                override fun apps() = listOf(pdd)
+                override fun isInstalled(pkg: String) = pkg == pdd.packageName
+                override fun prepareLaunch(app: AppEntry): Either<String, SystemLaunch> = Either.Right(TestSystemLaunch(SystemTarget.Known(app)))
+                override fun prepareUrl(url: String): Either<String, SystemLaunch> = error("unused")
+                override fun prepareIntent(spec: IntentSpec, selectedApp: AppEntry?): Either<String, SystemLaunch> = error("unused")
+                override fun launch(plan: SystemLaunch, dispatch: PhoneTasks.SystemDispatch): SysResult {
+                    check(dispatch.commitStart())
+                    current = page1
+                    return SysResult(true, "已尝试打开 拼多多", plan.target)
+                }
+                override fun notify(title: String, text: String) = error("unused")
+                override fun clipboardSet(text: String) = error("unused")
+                override fun clipboardGet() = error("unused")
+                override fun calendarList(start: LocalDate, until: LocalDate, zone: ZoneId) = error("unused")
+            }
         }, PhoneTasks(), ActionLog())
         try {
             val filtered = chainCore.call(PhoneToolCatalog.SCREEN, mapOf("query" to "个人中心"))
@@ -296,13 +312,37 @@ class PhoneToolSchemaTest {
             assertTrue(chained.text.contains("快递已签收"))
             assertFalse(chained.text.contains("查看物流"))
 
+            // Early stop must return the unfiltered intermediate screen and warn that executed steps are not undone.
             current = page1
             taps.clear()
-            val partial = chainCore.call(PhoneToolCatalog.TAP, mapOf("screen" to "s1", "id" to 3, "then" to listOf("待收货", "不存在")))
+            val partial = chainCore.call(PhoneToolCatalog.TAP, mapOf("screen" to "s1", "id" to 3, "then" to listOf("待收货", "不存在"), "query" to "永远不会匹配"))
             assertFalse(partial.isError)
-            assertTrue(partial.text.contains("连点中途停止（已完成 2/3 步"))
+            assertTrue(partial.text.contains("连点中途停止（已完成 2/3 步；已执行的步骤不会撤销"))
             assertTrue(partial.text.contains("2.✓ 点「待收货」(s2#4)"))
             assertTrue(partial.text.contains("3.✗ 未找到「不存在」"))
+            assertTrue(partial.text.contains("[6] 按钮 查看物流"))
+            assertFalse(partial.text.contains("命中 0/"))
+
+            // open(app, then, wait_for, query) runs end-to-end in a single call.
+            taps.clear()
+            val opened = chainCore.call(PhoneToolCatalog.OPEN, mapOf(
+                "app" to "拼多多",
+                "then" to listOf("个人中心", "待收货"),
+                "wait_for" to "签收",
+                "query" to "签收",
+            ))
+            assertFalse(opened.isError)
+            assertEquals(listOf(PhoneAction.Tap("s1", 3), PhoneAction.Tap("s2", 4)), taps)
+            assertTrue(opened.text.contains("连点完成（3/3 步）"))
+            assertTrue(opened.text.contains("快递已签收"))
+            assertFalse(opened.text.contains("查看物流"))
+
+            // wait_for timeout reports clearly and returns unfiltered screen.
+            current = page1
+            val timedOut = chainCore.call(PhoneToolCatalog.SCREEN, mapOf("wait_for" to "永远不出现", "query" to "个人中心"))
+            assertFalse(timedOut.isError)
+            assertTrue(timedOut.text.contains("等待「永远不出现」超时（5 秒），返回当前屏"))
+            assertTrue(timedOut.text.contains("[1] 按钮 搜索"))
         } finally {
             chainCore.worker.shutdown()
         }

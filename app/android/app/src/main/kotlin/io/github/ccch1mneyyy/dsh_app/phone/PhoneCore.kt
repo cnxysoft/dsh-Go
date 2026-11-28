@@ -408,7 +408,9 @@ class PhoneCore(
     private fun callBudgetMs(tool: String, args: Args): Long = when (tool) {
         PhoneToolCatalog.ANDROID_SHELL ->
             maxOf(budgetMs(tool), env.androidShellLimits().maxTimeoutMs + 15_000L).coerceAtMost(MAX_TOTAL_MS)
-        PhoneToolCatalog.TAP -> if (args.has("then")) 60_000L else budgetMs(tool)
+        PhoneToolCatalog.TAP -> if (args.has("then") || args.has("wait_for")) 60_000L else budgetMs(tool)
+        PhoneToolCatalog.OPEN -> if (args.has("then") || args.has("wait_for")) 65_000L else budgetMs(tool)
+        PhoneToolCatalog.SCREEN -> if (args.has("wait_for")) 25_000L else budgetMs(tool)
         else -> budgetMs(tool)
     }
 
@@ -544,6 +546,12 @@ class PhoneCore(
         val a = call.args
         val url = a.str("url")
         val background = a.bool("background") == true
+        val thenSteps = when (val parsed = PhoneFastActions.parseThenSteps(a.raw("then"))) {
+            is Either.Left -> return Out(parsed.value, error = true)
+            is Either.Right -> parsed.value
+        }
+        val waitFor = a.str("wait_for")
+        val query = a.str("query")
         if (env.isLocked()) return locked("open")
         val plan = checkNotNull(call.launch)
         if (url != null) {
@@ -558,7 +566,8 @@ class PhoneCore(
             confirmSystem(plan, scope, owner, summary)?.let { return it }
             skillTrace.markIncomplete(owner)
             val r = launchSystem(plan, owner)
-            return afterSystem(owner, scope, r, summary)
+            val opened = afterSystem(owner, scope, r, summary)
+            return postOpenFastActions(opened, PhoneScreen.MAIN, thenSteps, waitFor, query, summary, scope, owner)
         }
         // An explicit package is still subject to app rules even when its handler UID is unknown.
         val app = (plan.target as? SystemTarget.Known)?.app
@@ -576,7 +585,8 @@ class PhoneCore(
                     skillTrace.finish(ticket, it.ok, false, false)
                 }
             } catch (e: Throwable) { skillTrace.fail(ticket); throw e }
-            return afterSystem(owner, scope, result, summary)
+            val opened = afterSystem(owner, scope, result, summary)
+            return postOpenFastActions(opened, PhoneScreen.MAIN, thenSteps, waitFor, query, summary, scope, owner)
         }
         val driver = env.driver(PhoneScreen.BACKGROUND, owner)
             ?: return Out(env.backgroundUnavailable(), error = true, app = app.label, summary = ui.get("phone_log_open_background", "后台屏打开 %1\$s", app.packageName), decision = "unavailable") // l10n:keep test default
@@ -618,8 +628,44 @@ class PhoneCore(
         call.backgroundOpenConfirmed = res.backgroundOpenConfirmed
         if (!current(owner) || !tasks.setAppIfCurrent(owner, app.label)) return stoppedOut("open")
         if (!current(owner)) return stoppedOut("open")
-        return Out(res.message, error = !res.ok, screen = res.screen?.let { returnedScreen(driver, it, owner) }, app = app.label,
-            summary = ui.get("phone_log_open_background", "后台屏打开 %1\$s", app.packageName), decision = if (res.ok) decision else "failed") // l10n:keep test default
+        val bgSummary = ui.get("phone_log_open_background", "后台屏打开 %1\$s", app.packageName) // l10n:keep test default
+        val openedScreen = res.screen?.let { returnedScreen(driver, it, owner) }
+        val openedRefused = res.screen != null && openedScreen !== res.screen
+        val openedOut = Out(res.message, error = !res.ok, screen = openedScreen, app = app.label,
+            summary = bgSummary, decision = if (res.ok) decision else "failed")
+        if (!res.ok || openedRefused) return openedOut
+        return postOpenFastActions(openedOut, PhoneScreen.BACKGROUND, thenSteps, waitFor, query, bgSummary, scope, owner, driver)
+    }
+
+    private fun postOpenFastActions(
+        opened: Out,
+        which: PhoneScreen,
+        thenSteps: List<String>,
+        waitFor: String?,
+        query: String?,
+        summary: String,
+        scope: SerialWorker.Scope,
+        owner: PhoneTasks.Owner,
+        knownDriver: PhoneDriver? = null,
+    ): Out {
+        if (opened.error || (thenSteps.isEmpty() && waitFor.isNullOrBlank() && query.isNullOrBlank())) return opened
+        val initialScreen = opened.screen ?: return opened
+        if (initialScreen.secure) return opened
+        val driver = knownDriver ?: env.driver(which, owner)?.takeIf { runCatching { it.availability().ok }.getOrDefault(false) }
+            ?: return opened
+        if (thenSteps.isNotEmpty()) {
+            return runTapChain(
+                driver, which, initialScreen, false, opened.text, thenSteps, waitFor, query,
+                opened.app, summary, opened.decision ?: "ok", scope, owner,
+            )
+        }
+        val waited = waitForText(driver, initialScreen, false, waitFor, owner)
+        val delivered = if (waited.refused || waited.timedOut) waited.screen else waited.screen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        val note = if (waited.timedOut) {
+            // l10n:keep agent tool result
+            "\n等待「$waitFor」超时（5 秒），返回当前屏。"
+        } else ""
+        return Out(opened.text + note, error = false, screen = delivered, app = opened.app, summary = summary, decision = opened.decision)
     }
 
     /** The handler is a dispatch fact. Only the following read describes the actual foreground UI. */
@@ -926,15 +972,24 @@ class PhoneCore(
         if (!current(owner) || !tasks.setAppIfCurrent(owner, snap.appLabel)) return stoppedOut(summary)
         val shown = returnedScreen(driver, snap, owner)
         val refused = shown !== snap
-        val delivered = if (refused) shown else PhoneFastActions.filterSnapshot(shown, a.str("query"))
-        return Out(
+        val waitFor = a.str("wait_for")
+        val waited = if (refused) WaitOutcome(shown, true, false) else waitForText(driver, shown, false, waitFor, owner)
+        val finalRefused = refused || waited.refused
+        val delivered = if (finalRefused || waited.timedOut) waited.screen else waited.screen?.let { PhoneFastActions.filterSnapshot(it, a.str("query")) }
+        val text = when {
             // l10n:keep agent tool result
-            if (refused) "没有读取这个屏幕的内容。" else "",
-            error = refused,
+            finalRefused -> "没有读取这个屏幕的内容。"
+            // l10n:keep agent tool result
+            waited.timedOut -> "等待「$waitFor」超时（5 秒），返回当前屏。"
+            else -> ""
+        }
+        return Out(
+            text,
+            error = finalRefused,
             screen = delivered,
-            app = snap.appLabel ?: snap.packageName,
-            summary = "$summary ${snap.id}",
-            decision = if (refused) "refused:read" else "ok",
+            app = delivered?.appLabel ?: snap.appLabel ?: snap.packageName,
+            summary = "$summary ${delivered?.id ?: snap.id}",
+            decision = if (finalRefused) "refused:read" else "ok",
         )
     }
 
@@ -1109,6 +1164,7 @@ class PhoneCore(
         var submit = false
         var point: Pair<Int, Int>? = null
         var thenSteps: List<String> = emptyList()
+        var waitFor: String? = null
         var query: String? = null
         var summary: String
         when (name) {
@@ -1124,6 +1180,7 @@ class PhoneCore(
                     // l10n:keep agent tool result
                     return Out("long:true 不能与 then 联用。", error = true)
                 }
+                waitFor = a.str("wait_for")
                 query = a.str("query")
                 action = PhoneAction.Tap(sid, id, long)
                 kind = if (long) WriteKind.LONG_TAP else WriteKind.TAP
@@ -1261,17 +1318,59 @@ class PhoneCore(
         val firstScreen = res.screen?.let { returnedScreen(driver, it, owner) }
         val firstRefused = res.screen != null && firstScreen !== res.screen
         if (res.ok && thenSteps.isNotEmpty()) {
-            return runTapChain(driver, which, firstScreen, firstRefused, res.message, thenSteps, query, app, summary, decision, scope, owner)
+            return runTapChain(driver, which, firstScreen, firstRefused, res.message, thenSteps, waitFor, query, app, summary, decision, scope, owner)
         }
-        val finalScreen = if (firstRefused) firstScreen else firstScreen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        val waited = if (res.ok && !firstRefused) waitForText(driver, firstScreen, false, waitFor, owner)
+            else WaitOutcome(firstScreen, firstRefused, false)
+        val finalScreen = if (waited.refused || waited.timedOut) waited.screen else waited.screen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        val waitNote = if (waited.timedOut) {
+            // l10n:keep agent tool result
+            "\n等待「$waitFor」超时（5 秒），返回当前屏。"
+        } else ""
         return Out(
-            res.message,
+            res.message + waitNote,
             error = !res.ok,
             screen = finalScreen,
             app = app,
             summary = summary,
             decision = if (res.ok) decision else policyFailure.get()?.decision ?: "failed",
         )
+    }
+
+    private data class WaitOutcome(
+        val screen: ScreenSnapshot?,
+        val refused: Boolean,
+        val timedOut: Boolean,
+    )
+
+    private fun waitForText(
+        driver: PhoneDriver,
+        initialScreen: ScreenSnapshot?,
+        initialRefused: Boolean,
+        waitFor: String?,
+        owner: PhoneTasks.Owner,
+    ): WaitOutcome {
+        if (waitFor.isNullOrBlank() || initialScreen == null || initialRefused || initialScreen.secure) {
+            return WaitOutcome(initialScreen, initialRefused, timedOut = false)
+        }
+        if (PhoneFastActions.matchesWaitFor(initialScreen.text, waitFor)) {
+            return WaitOutcome(initialScreen, initialRefused, timedOut = false)
+        }
+        var cur = initialScreen
+        var refused = false
+        repeat(PhoneFastActions.WAIT_FOR_MAX_POLLS) {
+            env.sleep(PhoneFastActions.WAIT_FOR_POLL_MS)
+            if (!current(owner) || env.isLocked()) return WaitOutcome(cur, refused, timedOut = false)
+            val obs = driver.observe(detail = false, image = false)
+            val shown = returnedScreen(driver, obs, owner)
+            cur = shown
+            refused = shown !== obs
+            if (refused || shown.secure) return WaitOutcome(cur, refused, timedOut = false)
+            if (PhoneFastActions.matchesWaitFor(shown.text, waitFor)) {
+                return WaitOutcome(cur, refused = false, timedOut = false)
+            }
+        }
+        return WaitOutcome(cur, refused, timedOut = true)
     }
 
     /** Executes follow-up text-matched taps in-process while preserving every safety and read gate. */
@@ -1282,6 +1381,7 @@ class PhoneCore(
         initialRefused: Boolean,
         firstMessage: String,
         thenSteps: List<String>,
+        waitFor: String?,
         query: String?,
         initialApp: String?,
         summary: String,
@@ -1415,9 +1515,22 @@ class PhoneCore(
             }
         }
 
-        val finalScreen = if (curRefused) curScreen else curScreen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        val allCompleted = done == totalSteps
+        val waited = if (allCompleted && !curRefused) waitForText(driver, curScreen, false, waitFor, owner)
+            else WaitOutcome(curScreen, curRefused, timedOut = false)
+        if (waited.timedOut) {
+            // l10n:keep agent tool result
+            trace += "等待「$waitFor」超时（5 秒），返回当前屏"
+        }
+        // Only apply destination `query` when the chain finished and `wait_for` did not time out;
+        // on early stop or timeout, return the unfiltered current screen so recovery controls stay visible.
+        val finalScreen = if (!allCompleted || waited.refused || waited.timedOut) {
+            waited.screen
+        } else {
+            waited.screen?.let { PhoneFastActions.filterSnapshot(it, query) }
+        }
         // l10n:keep agent tool result
-        val header = if (done == totalSteps) "连点完成（$done/$totalSteps 步）：" else "连点中途停止（已完成 $done/$totalSteps 步，已完成步骤勿重放）："
+        val header = if (allCompleted) "连点完成（$done/$totalSteps 步）：" else "连点中途停止（已完成 $done/$totalSteps 步；已执行的步骤不会撤销，请勿重跑已完成步骤）："
         return Out(
             header + trace.joinToString(" → "),
             error = false,

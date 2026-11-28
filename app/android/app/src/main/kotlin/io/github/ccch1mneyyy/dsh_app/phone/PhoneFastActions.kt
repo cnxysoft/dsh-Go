@@ -9,8 +9,10 @@ internal object PhoneFastActions {
     const val MAX_CHAIN_STEPS = 5
     const val MAX_STEP_CHARS = 60
     const val MAX_QUERY_TERMS = 8
-    const val CHAIN_RETRY_COUNT = 2
-    const val CHAIN_RETRY_DELAY_MS = 450L
+    const val CHAIN_RETRY_COUNT = 6
+    const val CHAIN_RETRY_DELAY_MS = 400L
+    const val WAIT_FOR_MAX_POLLS = 12
+    const val WAIT_FOR_POLL_MS = 420L
 
     private val QUERY_SPLIT = Regex("""[\s|]+""")
     private val ROW_SPLIT = Regex(""" {3,}""")
@@ -41,6 +43,15 @@ internal object PhoneFastActions {
     fun parseQueryTerms(query: String?): List<String> {
         if (query.isNullOrBlank()) return emptyList()
         return query.trim().split(QUERY_SPLIT).map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(MAX_QUERY_TERMS)
+    }
+
+    /** Checks whether page content (excluding the top `屏幕 ...` header line when present) contains any wait term. */
+    fun matchesWaitFor(screenText: String, waitFor: String): Boolean {
+        val terms = parseQueryTerms(waitFor)
+        if (terms.isEmpty()) return true
+        val lines = screenText.lines()
+        val body = if (lines.size > 1) lines.drop(1) else lines
+        return body.any { line -> terms.any { term -> line.contains(term, ignoreCase = true) } }
     }
 
     fun parseThenSteps(raw: Any?): Either<String, List<String>> {

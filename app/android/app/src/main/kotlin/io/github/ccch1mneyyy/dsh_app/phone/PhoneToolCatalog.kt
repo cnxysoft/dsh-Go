@@ -80,7 +80,7 @@ object PhoneToolCatalog {
         Tool(
             OPEN,
             // l10n:keep agent tool catalog
-            "尝试打开应用或链接（app 或 url 二选一）。background:true 仅用于在后台屏打开应用（需用户开通不打扰模式）；可读取时返回新屏幕。启动回话不表示目标业务已经完成。",
+            "尝试打开应用或链接（app 或 url 二选一）。background:true 仅用于在后台屏打开应用（需用户开通不打扰模式）；可读取时返回新屏幕。可选 then 打开后在本机连续按文案点击 1–5 个目标；可选 wait_for 等待目标文案出现（最长 5 秒）；可选 query 筛选最终屏。启动回话不表示目标业务已经完成。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
                 "app" to str("包名或应用名"),
@@ -88,6 +88,16 @@ object PhoneToolCatalog {
                 "url" to str("网址或深链"),
                 // l10n:keep agent tool catalog
                 "background" to bool("在后台屏打开"),
+                "then" to linkedMapOf(
+                    "type" to "array",
+                    "items" to linkedMapOf("type" to "string"),
+                    // l10n:keep agent tool catalog
+                    "description" to "可选：打开后在本机连续按文案点击 1–5 个目标（如 [\"个人中心\",\"待收货\"]，重名可用 #N 或 #-1）；每步过安全检查，中途停下原样返回当前屏并标明 ✓/✗",
+                ),
+                // l10n:keep agent tool catalog
+                "wait_for" to str("可选：等待屏幕出现指定文案后再返回（空格或 | 分隔多个词，最长 5 秒）"),
+                // l10n:keep agent tool catalog
+                "query" to str("可选：全部步骤完成后按关键词筛选最终屏（空格或 | 分隔），省 token"),
             ),
             emptyList(),
         ),
@@ -177,6 +187,8 @@ object PhoneToolCatalog {
                 // l10n:keep agent tool catalog
                 "background" to bool("读后台屏（不打扰模式）"),
                 // l10n:keep agent tool catalog
+                "wait_for" to str("可选：等待本屏出现指定文案后再返回（空格或 | 分隔，最长 5 秒）"),
+                // l10n:keep agent tool catalog
                 "query" to str("可选：按关键词筛选本屏元素（空格或 | 分隔多个词），只返回命中项，省 token；省略读全屏"),
             ),
             emptyList(),
@@ -210,10 +222,12 @@ object PhoneToolCatalog {
                     "type" to "array",
                     "items" to linkedMapOf("type" to "string"),
                     // l10n:keep agent tool catalog
-                    "description" to "可选：点完 id 后在本机连续按文案点击 1–5 个后续目标（如 [\"待收货\",\"查看物流#1\"]，重名时可用 #N 选第 N 个或 #-1 选最后一个）；每步仍过安全检查，找不到、重名或遇敏感项立刻停下并返回每步 ✓/✗ 进度与当前屏；不能与 long:true 同用",
+                    "description" to "可选：点完 id 后在本机连续按文案点击 1–5 个后续目标（如 [\"待收货\",\"查看物流#1\"]，重名时可用 #N 选第 N 个或 #-1 选最后一个）；每步仍过安全检查，找不到、重名或遇敏感项立刻停下并返回每步 ✓/✗ 进度与未过滤当前屏；不能与 long:true 同用",
                 ),
                 // l10n:keep agent tool catalog
-                "query" to str("可选：按关键词筛选最终返回屏幕（空格或 | 分隔），省 token"),
+                "wait_for" to str("可选：全部步骤完成后等待屏幕出现指定文案（空格或 | 分隔，最长 5 秒）"),
+                // l10n:keep agent tool catalog
+                "query" to str("可选：全部步骤完成后按关键词筛选最终返回屏幕（空格或 | 分隔），省 token"),
             ),
             listOf("screen", "id"),
         ),
