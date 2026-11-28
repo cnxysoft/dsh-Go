@@ -90,5 +90,12 @@ class ChrootLaunchTest {
         assertTrue(script.contains("/system/bin/ls -ld /proc/[0-9]*/root"))
         assertTrue(script.contains("-xdev -user 0 -exec /system/bin/chown -h 10234:10234"))
         assertTrue(script.contains(ChrootLaunch.PID_FILE))
+        assertFalse(script.contains("\$ROOTFS/opt"))
+
+        val upgradeScript = ChrootLaunch.cleanupScript(root, 10234, 10234, includeEnginePaths = true)
+        assertTrue(upgradeScript.contains("\$ROOTFS/opt"))
+        assertTrue(upgradeScript.contains("\$ROOTFS/usr/local"))
+        assertTrue(upgradeScript.contains("'$runtime'/engine.upgrade"))
+        assertTrue(upgradeScript.contains("'$runtime'/engine.done"))
     }
 }

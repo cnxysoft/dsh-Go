@@ -55,6 +55,7 @@
 ## 变更日志
 
 ### 2026-11-29
+- **Root `chroot` 原地升级属主修复** — 在 `RuntimeController.install()` 与 `reset()` 进入引擎安装/恢复前调用 `ChrootLaunch.stopAndCleanup(..., includeEnginePaths = true)`，补齐 `opt/`、`usr/local/` 与 `engine.upgrade` / `engine.done` 的 `uid 0` 属主修复，并在 `EngineUpgrade.move()` 报错里输出具体相对路径，修复 `chroot` 模式下原地引擎升级触发 `could not move engine upgrade entry` 的问题。
 - **`android-long-session-history-cache.diff`** — 为 `dsh-llm-pi-ai`、`@earendil-works/pi-ai`（`sanitize-unicode`、`transform-messages`、`openai-responses-shared`）与 `dsh-llm-deepseek` 增加冻结长会话历史 `WeakMap`/`WeakSet` 缓存与 `isWellFormed()` 快路径，补齐 `android-long-session-history-cache.test.mjs` 单测，提升长会话首字输出速度。
 
 ### 2026-11-28

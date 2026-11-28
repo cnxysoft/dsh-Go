@@ -49,7 +49,7 @@ jobs:
         run: >-
           ./gradlew --stacktrace :app:testArm64DebugUnitTest -x :app:compileFlutterBuildArm64Debug
           --tests '*.PhoneAndroidShellTest' --tests '*.phone.shell.*' --tests '*.RootBackendTest'
-          --tests '*.PhoneFastActionsTest' --tests '*.PhoneToolSchemaTest'
+          --tests '*.PhoneFastActionsTest' --tests '*.PhoneToolSchemaTest' --tests '*.ChrootLaunchTest'
       - name: Install widget-test fonts
         run: |
           dir="$RUNNER_TEMP/dsh-test-fonts"

@@ -316,6 +316,13 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     !DshProcess(app, manifest, installer.rootfs, this).killStrays()) {
                     throw RuntimeUpgradeBlocked("running")
                 }
+                if (installer.rootfs.exists() &&
+                    (prefs.getBoolean(K_CHROOT_ENGINE, false) || File(installer.rootfs, ChrootLaunch.PID_FILE).exists())) {
+                    ChrootLaunch.findSu()?.let { su ->
+                        val uid = android.os.Process.myUid()
+                        ChrootLaunch.stopAndCleanup(su, installer.rootfs, uid, uid, timeoutMs = 20_000L, includeEnginePaths = true)
+                    }
+                }
                 if (dropKept) log("[dsh-app] installing without what could not be kept", "system")
                 installer.install(dropKept) { done, total ->
                     emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
@@ -859,7 +866,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 if (prefs.getBoolean(K_CHROOT_ENGINE, false) || File(installer.rootfs, ChrootLaunch.PID_FILE).exists()) {
                     ChrootLaunch.findSu()?.let { su ->
                         val uid = android.os.Process.myUid()
-                        ChrootLaunch.stopAndCleanup(su, installer.rootfs, uid, uid)
+                        ChrootLaunch.stopAndCleanup(su, installer.rootfs, uid, uid, timeoutMs = 20_000L, includeEnginePaths = true)
                     }
                 }
                 lastLaunch = null

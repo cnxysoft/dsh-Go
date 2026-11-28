@@ -147,7 +147,9 @@ internal class EngineUpgrade(
     }
 
     private fun move(from: File, to: File) {
-        check(from.renameTo(to)) { "could not move engine upgrade entry" }
+        check(from.renameTo(to)) {
+            "could not move engine upgrade entry (${from.relativeToOrSelf(base).path} -> ${to.relativeToOrSelf(base).path})"
+        }
         // Persist the destination before the source removal: a power cut must
         // not make an entry unreachable from both sides of a cross-dir rename.
         syncDirectory(to.parentFile!!)

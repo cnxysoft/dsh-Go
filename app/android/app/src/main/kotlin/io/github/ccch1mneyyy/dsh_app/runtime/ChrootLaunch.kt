@@ -165,9 +165,16 @@ object ChrootLaunch {
     /**
      * Generates a fast, toybox-compatible root cleanup script that terminates ONLY processes
      * whose `/proc/<pid>/root` points at [rootfs], removes stale pid markers, and restores
-     * ownership of any root-owned files under `root/`, `tmp/`, and `etc/` back to `[appUid]:[appGid]`.
+     * ownership of any root-owned files under `root/`, `tmp/`, and `etc/` (plus engine upgrade
+     * paths `opt/`, `usr/local/`, and pending upgrade journals when [includeEnginePaths] is true)
+     * back to `[appUid]:[appGid]`.
      */
-    fun cleanupScript(rootfs: String, appUid: Int, appGid: Int): String {
+    fun cleanupScript(
+        rootfs: String,
+        appUid: Int,
+        appGid: Int,
+        includeEnginePaths: Boolean = false,
+    ): String {
         require(absolutePath(rootfs) && appUid >= 0 && appGid >= 0)
         val qRoot = shQuote(rootfs)
         return buildString {
@@ -196,7 +203,15 @@ object ChrootLaunch {
             appendLine("  [ -n \"\$list\" ] && kill -KILL \$list 2>/dev/null || true")
             appendLine("fi")
             appendLine("rm -f \"\$ROOTFS/$PID_FILE\" \"\$ROOTFS/tmp/dsh-web.pid\" 2>/dev/null || true")
-            appendLine("for d in \"\$ROOTFS/root\" \"\$ROOTFS/tmp\" \"\$ROOTFS/etc\"; do")
+            if (includeEnginePaths) {
+                val base = rootfs.substringBeforeLast('/').takeIf { it.isNotEmpty() }
+                val qBase = base?.let(::shQuote)
+                appendLine("/system/bin/chown -h $appUid:$appGid \"\$ROOTFS\" \"\$ROOTFS/usr\" 2>/dev/null || true")
+                val extra = if (qBase != null) " $qBase/engine.upgrade $qBase/engine.done" else ""
+                appendLine("for d in \"\$ROOTFS/root\" \"\$ROOTFS/tmp\" \"\$ROOTFS/etc\" \"\$ROOTFS/opt\" \"\$ROOTFS/usr/local\"$extra; do")
+            } else {
+                appendLine("for d in \"\$ROOTFS/root\" \"\$ROOTFS/tmp\" \"\$ROOTFS/etc\"; do")
+            }
             appendLine("  [ -e \"\$d\" ] && /system/bin/find \"\$d\" -xdev -user 0 -exec /system/bin/chown -h $appUid:$appGid {} + 2>/dev/null || true")
             appendLine("done")
         }
@@ -209,6 +224,7 @@ object ChrootLaunch {
         appUid: Int,
         appGid: Int,
         timeoutMs: Long = 8_000L,
+        includeEnginePaths: Boolean = false,
     ): Boolean {
         val canonical = runCatching { rootfs.canonicalPath }.getOrNull() ?: return false
         if (!absolutePath(su) || !absolutePath(canonical) || appUid < 0 || appGid < 0) return false
@@ -217,7 +233,7 @@ object ChrootLaunch {
                 .redirectErrorStream(true)
                 .start()
             proc.outputStream.use { out ->
-                out.write(cleanupScript(canonical, appUid, appGid).toByteArray(Charsets.UTF_8))
+                out.write(cleanupScript(canonical, appUid, appGid, includeEnginePaths).toByteArray(Charsets.UTF_8))
                 out.flush()
             }
             val finished = proc.waitFor(timeoutMs.coerceAtLeast(1000L), TimeUnit.MILLISECONDS)
