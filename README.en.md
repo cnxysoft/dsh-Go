@@ -2,8 +2,8 @@
   <a href="README.md">简体中文</a> · <b>English</b>
 </p>
 
-> **Fork Notice (`cnxysoft/dsh-Go` · `codex/android-dc-session-compat`)**
-> This branch is maintained on top of upstream [`ccch1mneyyy/dsh-Go`](https://github.com/ccch1mneyyy/dsh-Go) (currently based on `v1.4.1`), adding direct Root Android Shell (configurable limits, 4-mode approval, lock-screen continuity), experimental native Root `chroot` backend & multi-directory mounts, DeepCode history compatibility, faster phone control (`query / then / wait_for`), and billion-scale usage formatting. See [**FORK_CHANGELOG.md**](FORK_CHANGELOG.md) for the full feature summary and changelog.
+> **Fork Notice (`cnxysoft/dsh-Go` · default branch `fork`)**
+> This branch is maintained on top of upstream [`ccch1mneyyy/dsh-Go`](https://github.com/ccch1mneyyy/dsh-Go) (`main` cleanly mirrors upstream, currently based on `v1.4.1`), adding direct Root Android Shell (configurable limits, 4-mode approval, lock-screen continuity), experimental native Root `chroot` backend & multi-directory mounts, faster phone control (`query / then / wait_for`), DSH `0.2.2-rc.3` `team/mode` history restore & `1600px / 1MB` request image compression, and billion-scale usage formatting. See [**FORK_CHANGELOG.md**](FORK_CHANGELOG.md) for the full feature summary and changelog.
 
 <p align="center">
   <picture>

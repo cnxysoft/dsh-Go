@@ -1,8 +1,9 @@
 # Fork Changelog (`cnxysoft/dsh-Go`)
 
-本文件记录 `cnxysoft/dsh-Go`（工作分支 `codex/android-dc-session-compat`）相对上游 [`ccch1mneyyy/dsh-Go`](https://github.com/ccch1mneyyy/dsh-Go) 新增与修改的全部内容。上游不包含本文件，以保持后续同步上游时的零合并冲突。
+本文件记录 `cnxysoft/dsh-Go`（默认分支 `fork`）相对上游 [`ccch1mneyyy/dsh-Go`](https://github.com/ccch1mneyyy/dsh-Go) 新增与修改的全部内容。`main` 分支保持与上游纯净同步；上游不包含本文件，以保持后续同步上游时的零合并冲突。
 
 - **当前上游基线**：`v1.4.1`（`3b9fbbbb5`，于 `2026-11-28` 合并 `62cc3f17f`）
+- **分支约定**：`main` 纯净跟踪上游 `upstream/main`；`fork` 为唯一长期维护的 Fork 默认分支
 - **并行测试包名**：`io.github.ccch1mneyyy.dsh_app.test`（可与官方正式版并存）
 - **Fork 构建入口**：GitHub Actions → `Android fork APK`（`workflow_dispatch` 手动触发或推送 `apk-*` tag）
 
@@ -10,9 +11,10 @@
 
 ## 核心特性总览
 
-### 1. Android Shell 直连 Root、审批策略与锁屏续跑
+### 1. Android Shell 直连 Root、审批策略、请求关联与锁屏续跑
 - 新增显式连接的 **Android Root Shell** 后端（无需依赖 PRoot 内绕路，支持冷启动自动重连与独立的重连卡片）。
 - **4 档审批策略**：支持「每次确认 / 限时有效 / 重启前有效 / 放行」及对应过期收尾。
+- **本机输入请求关联（`android-phone-prompt-correlation.diff` + `LocalPromptReceipts.kt`）**：将本机 App 输入框发送的用户消息 `rpcId` 透传到引擎 `phoneCaller.promptRequestId`，与原生回执核对关联，确认调用是否对应本机当轮输入。
 - **可配置执行限额**：支持调整单次命令字节上限（2–64 KB）、超时上限（60 秒–10 分钟）、输出上限（64–512 KB，Shizuku 侧维持 Binder 256 KB 硬顶），同步放宽 `ShellWire.MAX_FRAME` 至 2 MB 与 `PhoneCore` 动态调用预算。
 - **息屏 / 锁屏保活与执行开关**：息屏时保留仅含 Android Shell 的任务会话，新增「锁屏时允许执行 Android Shell」开关（UI 操控仍受锁屏限制）。
 
@@ -30,9 +32,10 @@
 - **安全回执与未过滤恢复屏**：`then` 中途停止或 `wait_for` 超时时，强制原样返回**未过滤**的当前屏，避免确认/弹窗按钮被终点 `query` 筛掉；中途停止回执逐条列出 `1.✓ / 2.✗` 并明确提示「已执行的步骤不会撤销，请勿重跑已完成步骤」。
 - **`open` 回执收口**：最终前台包名确认命中目标包名时，将第 1 步精简为 `已打开「<应用名>」`；若被权限弹窗或系统拦截导致包名不符，保留上游原提示以便排查。
 
-### 4. DeepCode 会话兼容
-- 恢复 DeepCode 历史会话记录，匹配 Android 侧请求图片预览。
-- 关联本地输入框请求状态，保持会话与消息体验一致。
+### 4. Android DSH 运行时兼容与模型请求图片压缩
+两项仅作用于 Android 运行时的补丁（不改动鸿蒙运行时）：
+- **`0.2.2-rc.3` 历史会话事件向下兼容（`android-session-team-mode.diff`）**：在内置 DSH `0.2.2-rc.1` 的会话恢复白名单中识别 `0.2.2-rc.3` 写入的 `team/mode`（智能体团队开关）只读日志事件，使从 `rc.3` 迁移的历史会话可以正常加载恢复（不启用团队模式功能，也不允许写入新事件）。
+- **模型请求图片压缩规格收紧（`android-request-preview.diff`）**：将 Android 发给大模型的请求图片长边上限从 `4096px` 压至 `1600px`、单图体积上限压至 `<= 1 MB`，并去掉小图直传分支统一走编码压缩阶梯（`request-image-android-p1`），降低传图体积与失败率。
 
 ### 5. 界面与用量统计修复
 - 修复十亿级 token 计数显示溢出：`1M–9.99M` 保留 2 位小数、`10M–99.9M` 保留 1 位小数、`100M–999M` 取整、`>= 1000M` 格式化为 `B`（如 `3.47B`）。
@@ -66,10 +69,10 @@
 - **`d2c9e3e42`** — 新增托管 `AGENTS.md` 开关，修复自检锁泄漏与收尾清理。
 - **`98129f53b`** — 息屏时保持 Android Shell 存活，并修复并行测试包自检。
 - **`87d87b92c`** — 新增 Android Shell 4 档审批策略（含定时与重启前自动失效）。
-- **`af95fc644` / `bfba88628`** — 支持 Android Shell 冷启动自动重连、修复重连竞态、拆分重连卡片、关联本地输入框请求并支持可选 Fork 签名。
+- **`af95fc644` / `bfba88628`** — 支持 Android Shell 冷启动自动重连、修复重连竞态、拆分重连卡片，新增 `android-phone-prompt-correlation.diff` + `LocalPromptReceipts` 本机输入关联，并支持可选 Fork 签名。
 
 ### 2026-11-26
-- **`4d1597263` / `7dfba1cdb`** — 恢复 DeepCode 历史会话、匹配 Android 请求图片预览，并建立独立兼容测试分支构建。
+- **`4d1597263` / `7dfba1cdb`** — 新增 `android-session-team-mode.diff`（在 DSH `0.2.2-rc.1` 恢复 `0.2.2-rc.3` 含 `team/mode` 事件的历史会话）与 `android-request-preview.diff`（Android 请求图片压至 `1600px / <=1MB`），并配置独立测试包构建。
 - **`44a184da8` / `cf456795c` / `fdb7f1b34` / `1d240a75e` / `319f9ccbc` / `23ea5efed`** — 初始引入显式连接的 Android Root Shell 后端与 Fork 独立 APK CI 构建链路。
 
 ---
@@ -77,5 +80,5 @@
 ## 合并上游提示
 
 为降低后续同步上游时的合并成本，本 Fork 尽量将核心增量代码收口在独立文件与最小接线点：
-- **独立文件（零冲突）**：`FORK_CHANGELOG.md`、`.github/workflows/android-fork-apk.yml`、`PhoneFastActions.kt`、`PhoneFastActionsTest.kt`、`RootBackend.kt` 等。
-- **高频交汇接线点（合上游时重点留意）**：`PhoneCore.kt`、`PhoneToolCatalog.kt`、`PhonePlugin.kt`、`usage_sheet.dart`、`app/lib/l10n/parts/*.arb`（合并后需重跑 `python3 app/tool/l10n_merge.py`）。
+- **独立文件（零冲突）**：`FORK_CHANGELOG.md`、`.github/workflows/android-fork-apk.yml`、`PhoneFastActions.kt`、`PhoneFastActionsTest.kt`、`RootBackend.kt`、`runtime/patches/android-*.diff` 等。
+- **高频交汇接线点（合上游时重点留意）**：`PhoneCore.kt`、`PhoneToolCatalog.kt`、`PhonePlugin.kt`、`usage_sheet.dart`、`runtime/patches/pins.json`、`app/lib/l10n/parts/*.arb`（合并后需重跑 `python3 app/tool/l10n_merge.py`）。
